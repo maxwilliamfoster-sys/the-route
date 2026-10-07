@@ -388,7 +388,8 @@ function busFrom(v) {
 }
 
 async function poll() {
-  if (polling || document.hidden) return;
+  // background tabs still poll, just rarely (and always once, so first paint is never empty)
+  if (polling || (document.hidden && lastOk && Date.now() - lastPoll < 60000)) return;
   polling = true;
   try {
     const r = await fetch(LIVE_URL(META), { cache: "no-store" });
