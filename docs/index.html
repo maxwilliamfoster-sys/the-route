@@ -415,7 +415,12 @@ async function poll() {
         if (ft > b.feedTime && (Math.abs(x - b.fx) > 0.3 || Math.abs(y - b.fy) > 0.3)) {
           const dtS = (ft - b.feedTime) / 1000;
           const p = roadPath(b.x, b.y, x, y);
-          if (dtS > 2) b.kmh = clamp(metres(p.len) / dtS * 3.6, 0, 120);
+          if (dtS > 4) {
+            // road distance, but never trust a detour more than 1.6x the straight line
+            const d = Math.min(p.len, Math.hypot(x - b.fx, y - b.fy) * 1.6 + 5);
+            const v = metres(d) / dtS * 3.6;
+            if (v < 105) b.kmh = b.kmh == null ? v : b.kmh * 0.5 + v * 0.5;   // drop GPS jumps, smooth the rest
+          }
           b.path = p; b.t0 = now; b.dur = Math.max(POLL_MS * 0.95, 4000);
           b.fx = x; b.fy = y; b.feedTime = ft;
         } else if (ft > b.feedTime) { b.feedTime = ft; b.kmh = 0; }
