@@ -3,236 +3,246 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
-<title>THE ROUTE — Cambridge, live</title>
-<meta name="theme-color" content="#0d0f14">
+<title>THE ROUTE · Cambridge, live</title>
+<meta name="theme-color" content="#212529">
+<!-- UI kit: NES.css (MIT, github.com/nostalgic-css/NES.css) · type: Departure Mono (OFL, github.com/rektdeckard/departure-mono) + Press Start 2P (OFL) -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/nes.css@2.3.0/css/nes.min.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap">
 <style>
+  @font-face{font-family:"Departure Mono"; src:url("fonts/DepartureMono-Regular.woff2") format("woff2"); font-display:swap}
   :root{
-    --bg:#0d0f14; --panel:#151922; --line:#252b38; --ink:#c9d3e3; --dim:#6b7689;
-    --hot:#e05c4a; --cool:#4a9ee0; --gold:#e0b44a; --good:#5fb87a;
+    --night:#181a1f; --panel:#212529; --line:#3a3f47; --ink:#f4f4f0; --dim:#9aa1ab;
+    --blue:#209cee; --green:#92cc41; --gold:#f7d51d; --red:#e76e55;
+    --mono:"Departure Mono", ui-monospace, Menlo, Consolas, monospace;
+    --pixel:"Press Start 2P", var(--mono);
   }
-  *{box-sizing:border-box; margin:0; padding:0}
-  html,body{height:100%}
+  *{box-sizing:border-box}
+  html,body{height:100%; margin:0}
   body{
-    background:var(--bg); color:var(--ink); overflow:hidden;
-    font:12px/1.5 ui-monospace,"SF Mono",Menlo,Consolas,monospace;
-    display:flex; flex-direction:column;
+    background:var(--night); color:var(--ink); overflow:hidden;
+    font:11px/1.6 var(--mono); display:flex; flex-direction:column;
+    -webkit-font-smoothing:none; font-smooth:never;
   }
-  header{
-    display:flex; align-items:center; gap:12px; flex-wrap:wrap;
-    padding:7px 12px; border-bottom:1px solid var(--line); background:var(--panel);
+  button, .nes-btn{font-family:var(--mono)}
+
+  /* ---------------------------------------------------------- top bar */
+  .topbar{
+    display:flex; align-items:center; gap:16px; flex-wrap:wrap;
+    padding:10px 16px; background:var(--panel); border-bottom:4px solid #000;
   }
-  header h1{font-size:15px; letter-spacing:3px; font-weight:700}
-  header h1 span{color:var(--gold)}
-  header .sub{color:var(--dim)}
-  #lvl{display:flex; align-items:center; gap:7px; margin-left:auto}
-  #lvl .bar{width:90px; height:6px; background:#0b0d12; border:1px solid var(--line); border-radius:3px; overflow:hidden}
-  #lvl .bar i{display:block; height:100%; background:var(--gold); width:0}
-  #lvl b{color:var(--gold); font-weight:600}
-  .badge{display:flex; gap:6px; align-items:center; color:var(--dim)}
-  #dot{width:7px;height:7px;border-radius:50%;background:var(--good);
-       box-shadow:0 0 8px var(--good); animation:pulse 2.4s infinite}
-  #dot.stale{background:var(--hot); box-shadow:0 0 8px var(--hot)}
-  @keyframes pulse{50%{opacity:.25}}
+  .logo{font:14px var(--pixel); letter-spacing:1px; white-space:nowrap}
+  .logo b{color:var(--gold); font-weight:400}
+  .tag{color:var(--dim); letter-spacing:2px}
+  .live{display:flex; gap:8px; align-items:center; color:var(--dim)}
+  #dot{width:8px; height:8px; background:var(--green); box-shadow:0 0 0 2px #000; animation:blink 1.6s steps(2) infinite}
+  #dot.stale{background:var(--red); animation:none}
+  @keyframes blink{50%{opacity:.25}}
+  .xp{display:flex; align-items:center; gap:10px; margin-left:auto; min-width:200px}
+  .xp .lv{font:10px var(--pixel); color:var(--gold); white-space:nowrap}
+  .xp .nes-progress{height:18px; margin:0; flex:1; min-width:90px}
+  .xp #lvT{color:var(--dim); white-space:nowrap}
 
   main{flex:1; display:flex; min-height:0}
-  #stage{flex:1; position:relative; min-width:0; background:#080a0e; overflow:hidden}
-  canvas{position:absolute; left:0; top:0; image-rendering:pixelated;
-         image-rendering:crisp-edges; cursor:grab; touch-action:none}
-  canvas.drag{cursor:grabbing}
-  #hud{
-    position:absolute; left:10px; top:10px; z-index:4; display:flex; flex-direction:column; gap:6px;
-    pointer-events:none;
-  }
+  #stage{flex:1; position:relative; min-width:0; overflow:hidden; background:#e9e6dc}
+  canvas{position:absolute; left:0; top:0; image-rendering:pixelated; image-rendering:crisp-edges; touch-action:none}
+
+  /* ---------------------------------------------------------- map HUD */
+  .hud-l{position:absolute; left:12px; top:12px; z-index:4; max-width:min(420px,58%)}
+  .hud-r{position:absolute; right:12px; top:12px; z-index:4; display:flex; flex-direction:column; gap:10px; align-items:flex-end}
+  .hud-r .nes-btn{font-size:11px; padding:2px 8px; margin:0}
+  .chips{display:flex; flex-wrap:wrap; gap:6px}
   .chip{
-    background:rgba(13,15,20,.82); border:1px solid var(--line); border-radius:7px;
-    padding:5px 9px; font-size:10.5px; backdrop-filter:blur(3px); pointer-events:auto;
+    font:11px var(--mono); padding:1px 6px; color:#000; cursor:pointer; user-select:none;
+    box-shadow:0 0 0 2px #000; border:0; line-height:16px;
   }
-  #legend{display:flex; flex-wrap:wrap; gap:3px 9px; max-width:min(360px,60vw)}
-  #legend .lg{display:flex; align-items:center; gap:4px; white-space:nowrap; cursor:pointer}
-  #legend .lg.off{opacity:.35}
-  #legend .sw{width:9px; height:9px; border-radius:2px; flex-shrink:0}
-  #legend .ct{color:var(--dim)}
-  #tools{position:absolute; right:10px; top:10px; z-index:4; display:flex; flex-direction:column; gap:5px}
-  #tools button, .btn{
-    background:rgba(13,15,20,.86); color:var(--ink); border:1px solid var(--line);
-    border-radius:6px; padding:5px 9px; font:inherit; font-size:11px; cursor:pointer;
+  .chip.off{opacity:.3}
+  .chip.all{background:var(--panel); color:var(--gold)}
+  .hint{
+    position:absolute; left:12px; bottom:12px; z-index:4; background:var(--panel); color:var(--dim);
+    padding:3px 8px; box-shadow:0 0 0 2px #000; pointer-events:none;
   }
-  #tools button:hover, .btn:hover{border-color:var(--gold); color:var(--gold)}
-  #tools button.on{border-color:var(--good); color:var(--good)}
-  #controls{
-    position:absolute; left:10px; bottom:8px; pointer-events:none;
-    color:var(--dim); font-size:10px; background:rgba(13,15,20,.72);
-    padding:3px 8px; border-radius:3px; opacity:.8;
-  }
-  #controls b{color:var(--gold); font-weight:400}
+  .hint b{color:var(--gold); font-weight:400}
   #toast{
-    position:absolute; left:50%; top:14px; transform:translateX(-50%); z-index:6;
-    background:var(--gold); color:#14171d; font-weight:700; padding:6px 14px; border-radius:4px;
-    font-size:12px; opacity:0; transition:opacity .25s, top .25s; pointer-events:none; white-space:nowrap;
+    position:absolute; left:50%; top:16px; transform:translate(-50%,-12px); z-index:9; opacity:0;
+    transition:opacity .2s, transform .2s; pointer-events:none; white-space:nowrap;
+    background:#fff; color:#212529; padding:8px 14px 8px 10px; display:flex; align-items:center; gap:10px;
+    box-shadow:0 0 0 4px #000;
   }
-  #toast.show{opacity:1; top:22px}
+  #toast.show{opacity:1; transform:translate(-50%,0)}
 
-  aside{
-    width:330px; border-left:1px solid var(--line); background:var(--panel);
-    display:flex; flex-direction:column; min-height:0;
-  }
-  #card{border-bottom:1px solid var(--line); padding:11px 12px; display:none}
+  /* ---------------------------------------------------------- sidebar */
+  aside{width:360px; background:var(--panel); border-left:4px solid #000; display:flex; flex-direction:column; min-height:0}
+  .pad{padding:14px 14px 0}
+  .nes-container.is-dark{background:var(--panel); padding:14px 14px 12px; margin:6px 0 16px}
+  .nes-container.with-title>.title{font:10px var(--pixel); background:var(--panel); padding:0 8px; margin-top:-21px; margin-bottom:10px}
+  #card{display:none}
   #card.show{display:block}
-  #card .top{display:flex; align-items:center; gap:8px}
-  #card .route{font-weight:800; font-size:14px; padding:2px 8px; border-radius:4px; color:#0d0f14}
-  #card h2{font-size:13px; letter-spacing:.5px}
-  #card .who{color:var(--gold); margin-top:5px}
-  #card .trait{color:var(--dim); font-style:italic; margin-top:1px}
-  #card .kv{display:grid; grid-template-columns:auto 1fr; gap:1px 10px; margin-top:7px; color:#a8b4c8}
-  #card .kv span:nth-child(odd){color:var(--dim)}
-  #card .acts{display:flex; gap:6px; margin-top:9px; flex-wrap:wrap}
-  #card .acts .btn.go{border-color:var(--gold); color:var(--gold)}
-  #card .acts .btn.done{border-color:var(--good); color:var(--good); cursor:default}
-  #card ul{margin-top:6px}
-  #card li{list-style:none; padding:3px 0; border-bottom:1px dashed var(--line); display:flex; gap:7px; align-items:center; cursor:pointer}
-  #card li:hover{color:var(--gold)}
-  #card .x{margin-left:auto; cursor:pointer; color:var(--dim); font-size:14px}
-  .pill{font-weight:800; padding:0 6px; border-radius:3px; color:#0d0f14; font-size:11px}
-
-  nav{display:flex; border-bottom:1px solid var(--line)}
-  nav button{
-    flex:1; background:none; border:0; color:var(--dim); font:inherit; font-size:11px; letter-spacing:2px;
-    padding:8px 0; cursor:pointer; border-bottom:2px solid transparent;
+  .head{display:flex; align-items:center; gap:10px}
+  .head h2{font:400 11px var(--mono); margin:0; flex:1; min-width:0}
+  .head .x{cursor:pointer; color:var(--dim)}
+  .rt{
+    display:inline-block; font:11px var(--mono); padding:0 6px; color:#000; line-height:16px;
+    box-shadow:0 0 0 2px #000; min-width:22px; text-align:center;
   }
-  nav button.on{color:var(--gold); border-bottom-color:var(--gold)}
-  #panel{flex:1; overflow-y:auto; padding:10px 12px}
-  #panel h3{font-size:10px; letter-spacing:2px; color:var(--dim); font-weight:600; margin:10px 0 6px}
-  #panel h3:first-child{margin-top:0}
-  .row{display:flex; align-items:center; gap:8px; padding:4px 0; border-bottom:1px solid #1b2030}
-  .row .n{color:var(--dim); width:18px; text-align:right}
-  .row .grow{flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
-  .row .v{color:#a8b4c8}
+  .rt.big{font:12px var(--pixel); padding:5px 7px; line-height:12px}
+  .who{color:var(--gold); margin-top:10px}
+  .nes-balloon.is-dark{font-size:11px; padding:8px 12px; margin:8px 0 30px 10px; background:var(--panel)}
+  .kv{display:grid; grid-template-columns:auto 1fr; gap:2px 14px}
+  .kv span:nth-child(odd){color:var(--dim)}
+  .acts{display:flex; gap:10px; margin-top:14px; flex-wrap:wrap}
+  .acts .nes-btn{font-size:11px; padding:2px 8px; margin:0}
+  ul.list{list-style:none; padding:0; margin:6px 0 0}
+  ul.list li{display:flex; gap:8px; align-items:center; padding:4px 0; border-bottom:2px dotted var(--line); cursor:pointer}
+  ul.list li:hover{color:var(--gold)}
+  ul.list li .r{margin-left:auto; color:var(--dim)}
+  .tabs{display:flex; gap:8px; padding:12px 14px 4px}
+  .tabs .nes-btn{flex:1; font:9px var(--pixel); padding:6px 0; margin:0}
+  #panel{flex:1; overflow-y:auto; padding:10px 14px 18px}
+  .stats{display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin:4px 0 14px}
+  .stats div{background:#2b3036; box-shadow:0 0 0 2px #000; padding:7px 8px}
+  .stats b{display:block; font:16px var(--pixel); margin-bottom:6px}
+  .stats span{color:var(--dim)}
+  h3{font:9px var(--pixel); color:var(--dim); margin:16px 0 8px; letter-spacing:1px}
+  .row{display:flex; align-items:center; gap:8px; padding:4px 0; border-bottom:2px dotted var(--line)}
+  .row .n{color:var(--dim); width:16px; text-align:right}
+  .row .g{flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+  .row .v{color:var(--ink)}
   .row.click{cursor:pointer}
-  .row.click:hover .grow{color:var(--gold)}
-  .mission{border:1px solid var(--line); border-radius:6px; padding:8px 9px; margin-bottom:7px}
-  .mission.done{border-color:var(--good)}
-  .mission .t{display:flex; justify-content:space-between; gap:8px}
-  .mission .xp{color:var(--gold)}
-  .mission .pb{height:5px; background:#0b0d12; border-radius:3px; margin-top:6px; overflow:hidden}
-  .mission .pb i{display:block; height:100%; background:var(--good)}
-  .stat{display:grid; grid-template-columns:repeat(3,1fr); gap:6px; margin-bottom:8px}
-  .stat div{background:#10131a; border:1px solid var(--line); border-radius:6px; padding:6px 7px}
-  .stat b{display:block; font-size:16px; color:var(--ink)}
-  .stat span{color:var(--dim); font-size:10px}
-  .muted{color:var(--dim)}
-  .gold{color:var(--gold)}
-  .dex{display:grid; grid-template-columns:repeat(auto-fill,minmax(88px,1fr)); gap:5px}
-  .dex div{background:#10131a; border:1px solid var(--line); border-radius:5px; padding:5px 6px; cursor:pointer}
-  .dex div.irl{border-color:var(--gold)}
-  .dex div b{display:block; font-size:11px}
-  .dex div span{color:var(--dim); font-size:9.5px}
-  #intro{
-    position:absolute; inset:0; z-index:8; background:rgba(8,10,14,.92); display:none;
-    align-items:center; justify-content:center; padding:18px;
-  }
+  .row.click:hover .g{color:var(--gold)}
+  .bar{height:6px; background:#000; flex:0 0 60px; position:relative}
+  .bar i{position:absolute; inset:0 auto 0 0; background:var(--green)}
+  .mission{background:#2b3036; box-shadow:0 0 0 2px #000; padding:10px; margin:0 2px 14px}
+  .mission .t{display:flex; justify-content:space-between; gap:8px; margin-bottom:6px}
+  .mission .t .xpv{color:var(--gold); white-space:nowrap}
+  .mission .nes-progress{height:14px; margin:0; width:100%}
+  .mission.done{box-shadow:0 0 0 2px var(--green)}
+  .dex{display:grid; grid-template-columns:repeat(auto-fill,minmax(96px,1fr)); gap:10px; padding:2px}
+  .dex div{background:#2b3036; box-shadow:0 0 0 2px #000; padding:6px 7px; cursor:pointer}
+  .dex div.irl{box-shadow:0 0 0 2px var(--gold)}
+  .dex div b{display:block; font-weight:400}
+  .dex div span{color:var(--dim)}
+  .muted{color:var(--dim)} .gold{color:var(--gold)} .green{color:var(--green)}
+  a{color:var(--blue)}
+  #intro{position:absolute; inset:0; z-index:10; background:rgba(24,26,31,.88); display:none; align-items:center; justify-content:center; padding:16px}
   #intro.show{display:flex}
-  #intro .box{max-width:460px; background:var(--panel); border:1px solid var(--line); border-left:2px solid var(--gold); padding:16px 18px}
-  #intro h2{letter-spacing:3px; font-size:14px; margin-bottom:8px}
-  #intro p{color:#a8b4c8; margin-bottom:8px}
+  #intro .nes-container{max-width:470px; margin:0}
+  #intro p{margin:0 0 10px}
   #intro b{color:var(--gold); font-weight:400}
 
   @media (max-width:760px){
     main{flex-direction:column}
-    aside{width:auto; height:42%; border-left:0; border-top:1px solid var(--line)}
-    header .sub{display:none}
-    #controls{display:none}
-    #legend{max-width:58vw; font-size:9.5px}
+    aside{width:auto; height:44%; border-left:0; border-top:4px solid #000}
+    .tag,.hint{display:none}
+    .topbar{gap:10px; padding:8px 12px}
+    .xp{min-width:0; flex-basis:100%; margin-left:0}
+    .hud-l{max-width:56%}
+    aside{height:40%}
+    .hud-r{gap:8px}
+    .hud-r .nes-btn{font-size:10px; padding:0 6px}
+    .chip{font-size:10px; padding:0 4px}
   }
 </style>
 </head>
 <body>
-<header>
-  <h1>THE <span>ROUTE</span></h1>
-  <div class="sub">Cambridge · every bus, live</div>
-  <div class="badge"><div id="dot"></div><span id="status">connecting…</span></div>
-  <div id="lvl"><span>LV <b id="lvN">1</b></span><div class="bar"><i id="lvBar"></i></div><span class="muted" id="lvT">Rookie Spotter</span></div>
+<header class="topbar">
+  <div class="logo">THE <b>ROUTE</b></div>
+  <span class="tag">CAMBRIDGE · LIVE BUSES</span>
+  <div class="live"><i id="dot"></i><span id="status">connecting…</span></div>
+  <div class="xp"><span class="lv">LV <span id="lvN">1</span></span>
+    <progress class="nes-progress is-warning" id="lvBar" value="0" max="100"></progress><span id="lvT">Rookie Spotter</span></div>
 </header>
 <main>
   <div id="stage">
     <canvas id="cv"></canvas>
-    <div id="hud"><div class="chip" id="legend"></div></div>
-    <div id="tools">
-      <button id="bHome" title="Back to the city centre">⌂ centre</button>
-      <button id="bGps" title="Use your real location to check in at stops and catch buses">◎ go live (GPS)</button>
-      <button id="bStops" class="on" title="Show bus stops">▣ stops</button>
-      <button id="bTrails" class="on" title="Show where buses have just been">〰 trails</button>
+    <div class="hud-l"><div class="chips" id="legend"></div></div>
+    <div class="hud-r">
+      <button class="nes-btn" id="bHome" title="Back to the city centre">⌂ centre</button>
+      <button class="nes-btn" id="bGps" title="Use your real location to check in at stops and catch buses">◎ GPS</button>
+      <button class="nes-btn" id="bRoutes" title="Route lines: live / all / off">routes: live</button>
+      <button class="nes-btn" id="bStyle" title="Map style">map: clear</button>
+      <button class="nes-btn is-success" id="bStops" title="Show bus stops">stops</button>
     </div>
-    <div id="controls"><b>drag</b> pan · <b>scroll</b> zoom · <b>click</b> a bus or stop</div>
-    <div id="toast"></div>
-    <div id="intro"><div class="box">
-      <h2>THE <span class="gold">ROUTE</span></h2>
-      <p>This is <b>real Cambridge</b>, drawn pixel by pixel from OpenStreetMap. Every bus on it is a <b>real bus, right now</b>, moving along the real roads. All 700+ real bus stops are on the map too.</p>
-      <p><b>Spot</b> buses on the map to fill your Busdex. Turn on <b>go live (GPS)</b> when you're out in Cambridge: stand near a real bus to <b>catch</b> it, or near a real stop to <b>check in</b>. That earns far more XP.</p>
-      <p class="muted">There are three daily missions, and they reset at midnight.</p>
-      <p style="margin-top:12px"><button class="btn" id="bStart">start spotting →</button></p>
+    <div class="hint"><b>drag</b> pan · <b>scroll</b> zoom · <b>tap</b> a bus or stop</div>
+    <div id="toast"><i class="nes-icon coin is-small"></i><span id="toastT"></span></div>
+    <div id="intro"><div class="nes-container is-dark with-title">
+      <p class="title">THE ROUTE</p>
+      <p>This is <b>real Cambridge</b>, drawn from OpenStreetMap. Every badge on it is a <b>real bus, right now</b>, on its real route. All 700+ stops are on the map too.</p>
+      <p><b>Spot</b> buses to fill your Busdex. Out in town? Turn on <b>GPS</b> and stand near a real bus to <b>catch</b> it, or near a stop to <b>check in</b>. That's worth far more XP.</p>
+      <p class="muted">There are three missions a day, and they reset at midnight.</p>
+      <button class="nes-btn is-primary" id="bStart">START SPOTTING</button>
     </div></div>
   </div>
   <aside>
-    <div id="card"></div>
-    <nav><button data-tab="live" class="on">LIVE</button><button data-tab="missions">MISSIONS</button><button data-tab="dex">BUSDEX</button></nav>
+    <div class="pad"><section class="nes-container is-dark with-title" id="card"></section></div>
+    <div class="tabs">
+      <button class="nes-btn is-warning" data-tab="live">LIVE</button>
+      <button class="nes-btn" data-tab="missions">QUESTS</button>
+      <button class="nes-btn" data-tab="dex">BUSDEX</button>
+    </div>
     <div id="panel"></div>
   </aside>
 </main>
 <script>
 "use strict";
 // ======================================================================
-//  THE ROUTE — live Cambridge bus map, pixel-art, gamified.
-//  Map tiles + stops + road graph are baked by tools/bake.py.
-//  Live vehicle positions: bustimes.org (BODS data, Open Government Licence).
+//  THE ROUTE — live Cambridge buses on a real map, made clear and playable.
+//  Baked by tools/bake.py (tiles, stops, roads) + tools/bake_routes.py
+//  (route lines + routes-per-stop, from the official BODS GTFS).
+//  Live positions: bustimes.org (Bus Open Data Service, OGL).
 // ======================================================================
 const LIVE_URL = (m) =>
   `https://bustimes.org/vehicles.json?ymax=${m.lat1}&xmax=${m.lon1}&ymin=${m.lat0}&xmin=${m.lon0}`;
 const POLL_MS = 12000;
 const CATCH_M = 80, CHECKIN_M = 45;
+const HOME = { x: 1880, y: 1680, z: 2 };
+const FONT = '"Departure Mono", ui-monospace, Menlo, monospace';
 
 const cv = document.getElementById("cv"), ctx = cv.getContext("2d");
-let META, STOPS = [], LABELS = [], G = null;
-const tiles = new Map();          // "c_r" -> Image
-let overview = null;
-const cam = { x: 1840, y: 1660, z: 2 };
+let META, STOPS = [], LABELS = [], ROUTES = new Map(), G = null;
+const tiles = new Map();
+const overviews = {};
+const cam = { ...HOME };
 let DPR = 1, CW = 0, CH = 0;
-let showStops = true, showTrails = true;
+let showStops = true, routesMode = "live", mapStyle = "clear";
 const hiddenRoutes = new Set();
 
 // ---------------------------------------------------------------- utils
 const $ = (id) => document.getElementById(id);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 function hash(s) { let h = 2166136261; for (const ch of String(s)) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619); } return h >>> 0; }
-function proj(lat, lon) {
-  return [(lon - META.lon0) * META.mPerDegLon / META.mpp, (META.lat1 - lat) * META.mPerDegLat / META.mpp];
-}
-function unproj(x, y) {
-  return [META.lat1 - y * META.mpp / META.mPerDegLat, META.lon0 + x * META.mpp / META.mPerDegLon];
-}
+function proj(lat, lon) { return [(lon - META.lon0) * META.mPerDegLon / META.mpp, (META.lat1 - lat) * META.mPerDegLat / META.mpp]; }
+function unproj(x, y) { return [META.lat1 - y * META.mpp / META.mPerDegLat, META.lon0 + x * META.mpp / META.mPerDegLon]; }
 const toScreen = (x, y) => [(x - cam.x) * cam.z * DPR + CW / 2, (y - cam.y) * cam.z * DPR + CH / 2];
 const toMap = (sx, sy) => [(sx - CW / 2) / (cam.z * DPR) + cam.x, (sy - CH / 2) / (cam.z * DPR) + cam.y];
 const metres = (px) => px * META.mpp;
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-function toast(msg) { const t = $("toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove("show"), 2600); }
+function toast(msg) { $("toastT").textContent = msg; const t = $("toast"); t.classList.add("show"); clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove("show"), 2600); }
 function today() { return new Date().toLocaleDateString("en-CA", { timeZone: "Europe/London" }); }
+function store(k, v) { try { localStorage.setItem(k, v); } catch {} }
+function recall(k) { try { return localStorage.getItem(k); } catch { return null; } }
 
 // ---------------------------------------------------------- route colours
+// One bold, distinct colour per line, tuned to read on the pale map.
 const ROUTE_COL = {
-  "1": "#e0503c", "2": "#4a9ee0", "3": "#5fb87a", "4": "#e0b44a", "5": "#b46ee0", "6": "#e07a3c",
-  "7": "#3cc0b4", "8": "#e05c9a", "U1": "#8ad04a", "U2": "#7ab0ff", "A": "#ff8a3c", "B": "#3c78e0",
-  "C": "#c8c83c", "X3": "#d06060", "905": "#a0a0b4", "13": "#c09060", "18": "#60a0a0",
-  "PR1": "#9ad0ff", "PR2": "#ffd09a", "PR3": "#c0ff9a", "PR5": "#ff9ad0",
+  "1": "#e4422f", "2": "#1f8fe0", "3": "#3aa655", "4": "#e9b11a", "5": "#9b59d0", "6": "#f07d1e",
+  "7": "#14b3a3", "8": "#e0458b", "8A": "#c2387a", "13": "#a8743e", "13A": "#8c6034", "18": "#4d8f8f",
+  "U1": "#76b82a", "U2": "#5f9be8", "A": "#ff7a1a", "B": "#2f5fd0", "C": "#b7b51c",
+  "X3": "#c94f4f", "X13": "#7a5ac8", "905": "#6f7787", "PR1": "#5fb3e8", "PR2": "#f0a04b",
+  "PR3": "#62bf6a", "PR4": "#c86ad0", "PR5": "#e86a6a", "T2": "#3c9a7a", "T3": "#a06ad0",
+  "T4": "#d08a3c", "T5": "#3c7ad0", "Tour": "#d4a017",
 };
-const FALLBACK = ["#e06b6b", "#6bb0e0", "#7fd08f", "#e0c06b", "#c08fe0", "#e0956b", "#6be0d0", "#e08fbd", "#a8d06b", "#8f9fe0"];
-function routeColour(line) {
-  if (!line) return "#9aa3b2";
-  return ROUTE_COL[line] || FALLBACK[hash(line) % FALLBACK.length];
+const FALLBACK = ["#d9534f", "#2a9fd6", "#4cae4c", "#e6a817", "#9b59d0", "#f0782d", "#17a2b8", "#e83e8c", "#7cb342", "#5c6bc0"];
+const routeColour = (line) => !line ? "#8a909a" : ROUTE_COL[line] || FALLBACK[hash(line) % FALLBACK.length];
+function inkFor(hex) {
+  const n = parseInt(hex.slice(1), 16), r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+  return (0.299 * r + 0.587 * g + 0.114 * b) > 150 ? "#000" : "#fff";
 }
+const pill = (line, big) => `<span class="rt${big ? " big" : ""}" style="background:${routeColour(line)};color:${inkFor(routeColour(line))}">${esc(line)}</span>`;
 
 // ---------------------------------------------------------- personalities
-// Every real bus gets a stable character, THE CUT-style, from its fleet number.
 const FIRST = ["Doris","Barry","Gwen","Keith","Maureen","Trevor","Pam","Nigel","Sheila","Clive","Brenda","Derek","Jean","Colin","Val","Roy","Margaret","Kevin","Irene","Graham","Linda","Stan","Joyce","Dennis","Hilda","Malcolm","Carol","Terry","Edna","Geoff","Wendy","Alan","Rita","Norman","Sandra","Phil","Beryl","Ron","Glenys","Dave"];
-const EPI = ["the Unstoppable","of Milton","the Punctual","the Wanderer","Big","Old","the Swift","the Slightly Late","of the Busway","the Brave","the Patient","the Diesel Dreamer","the Night Owl","the Gentle Giant","of Trumpington","the Shortcut King","the Reliable","the Mysterious","of Cherry Hinton","the Philosopher"];
+const EPI = ["the Unstoppable","of Milton","the Punctual","the Wanderer","the Big","the Old","the Swift","the Slightly Late","of the Busway","the Brave","the Patient","the Diesel Dreamer","the Night Owl","the Gentle Giant","of Trumpington","the Shortcut King","the Reliable","the Mysterious","of Cherry Hinton","the Philosopher"];
 const TRAIT = [
   "Takes every speed bump personally.", "Has opinions about the Mill Road bridge.", "Always early, never forgiven for it.",
   "Dreams of the open busway.", "Knows every pothole by name.", "Secretly hates roundabouts.",
@@ -247,8 +257,7 @@ function persona(fleet) {
 }
 
 // ================================================================ ROAD GRAPH
-// Buses are moved along the real road network: A* between successive
-// reported positions, so they turn corners instead of flying over colleges.
+// Moves between reported positions follow the real road network (A*).
 function buildGraph(g) {
   const s = g.scale, N = g.n.length / 2;
   const X = new Float32Array(N), Y = new Float32Array(N);
@@ -256,44 +265,31 @@ function buildGraph(g) {
   const E = g.e.length / 3;
   const ea = new Int32Array(E), eb = new Int32Array(E), eo = new Uint8Array(E);
   const deg = new Int32Array(N + 1);
-  for (let k = 0; k < E; k++) {
-    ea[k] = g.e[3 * k]; eb[k] = g.e[3 * k + 1]; eo[k] = g.e[3 * k + 2];
-    deg[ea[k]]++; if (!eo[k]) deg[eb[k]]++;
-  }
+  for (let k = 0; k < E; k++) { ea[k] = g.e[3 * k]; eb[k] = g.e[3 * k + 1]; eo[k] = g.e[3 * k + 2]; deg[ea[k]]++; if (!eo[k]) deg[eb[k]]++; }
   const off = new Int32Array(N + 1);
   for (let i = 0; i < N; i++) off[i + 1] = off[i] + deg[i];
   const adj = new Int32Array(off[N]), fill = off.slice(0, N);
-  for (let k = 0; k < E; k++) {
-    adj[fill[ea[k]]++] = eb[k];
-    if (!eo[k]) adj[fill[eb[k]]++] = ea[k];
-  }
-  // spatial grid of edges for snapping
-  const CELL = 48, gw = Math.ceil(META.W / CELL) + 10, gh = Math.ceil(META.H / CELL) + 10;
-  const grid = new Map();
-  const cellKey = (cx, cy) => cy * gw + cx;
+  for (let k = 0; k < E; k++) { adj[fill[ea[k]]++] = eb[k]; if (!eo[k]) adj[fill[eb[k]]++] = ea[k]; }
+  const CELL = 48, gw = Math.ceil(META.W / CELL) + 10;
+  const grid = new Map(), cellKey = (cx, cy) => cy * gw + cx;
   for (let k = 0; k < E; k++) {
     const a = ea[k], b = eb[k];
     const x0 = Math.floor(Math.min(X[a], X[b]) / CELL), x1 = Math.floor(Math.max(X[a], X[b]) / CELL);
     const y0 = Math.floor(Math.min(Y[a], Y[b]) / CELL), y1 = Math.floor(Math.max(Y[a], Y[b]) / CELL);
     for (let cx = x0; cx <= x1; cx++) for (let cy = y0; cy <= y1; cy++) {
-      const key = cellKey(cx + 5, cy + 5);
-      let l = grid.get(key); if (!l) grid.set(key, l = []); l.push(k);
+      const key = cellKey(cx + 5, cy + 5); let l = grid.get(key); if (!l) grid.set(key, l = []); l.push(k);
     }
   }
   return { X, Y, ea, eb, eo, off, adj, grid, CELL, cellKey };
 }
-
 function snap(px, py, maxD = 14) {
   const { X, Y, ea, eb, eo, grid, CELL, cellKey } = G;
-  const cx = Math.floor(px / CELL), cy = Math.floor(py / CELL);
-  const found = [];
+  const cx = Math.floor(px / CELL), cy = Math.floor(py / CELL), found = [];
   for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) {
     const l = grid.get(cellKey(cx + dx + 5, cy + dy + 5)); if (!l) continue;
     for (const k of l) {
-      const a = ea[k], b = eb[k];
-      const vx = X[b] - X[a], vy = Y[b] - Y[a], L2 = vx * vx + vy * vy || 1e-9;
-      const t = clamp(((px - X[a]) * vx + (py - Y[a]) * vy) / L2, 0, 1);
-      const qx = X[a] + vx * t, qy = Y[a] + vy * t;
+      const a = ea[k], b = eb[k], vx = X[b] - X[a], vy = Y[b] - Y[a], L2 = vx * vx + vy * vy || 1e-9;
+      const t = clamp(((px - X[a]) * vx + (py - Y[a]) * vy) / L2, 0, 1), qx = X[a] + vx * t, qy = Y[a] + vy * t;
       const d = Math.hypot(px - qx, py - qy);
       if (d <= maxD) found.push({ k, t, x: qx, y: qy, d, a, b, ow: eo[k], len: Math.sqrt(L2) });
     }
@@ -303,30 +299,19 @@ function snap(px, py, maxD = 14) {
   for (const f of found) { if (seen.has(f.k)) continue; seen.add(f.k); out.push(f); if (out.length >= 3) break; }
   return out;
 }
-
-// binary heap A* from a snapped start to a snapped end
 function route(s, e, limit = 6000) {
   const { X, Y, off, adj } = G;
-  const gScore = new Map(), came = new Map();
-  const heap = [];
+  const gScore = new Map(), came = new Map(), heap = [];
   const push = (n, f) => { heap.push([f, n]); let i = heap.length - 1; while (i > 0) { const p = (i - 1) >> 1; if (heap[p][0] <= heap[i][0]) break; [heap[p], heap[i]] = [heap[i], heap[p]]; i = p; } };
   const pop = () => { const top = heap[0], last = heap.pop(); if (heap.length) { heap[0] = last; let i = 0; for (;;) { const l = 2 * i + 1, r = l + 1; let m = i; if (l < heap.length && heap[l][0] < heap[m][0]) m = l; if (r < heap.length && heap[r][0] < heap[m][0]) m = r; if (m === i) break; [heap[m], heap[i]] = [heap[i], heap[m]]; i = m; } } return top; };
-  const hx = e.x, hy = e.y;
-  const H_ = (n) => Math.hypot(X[n] - hx, Y[n] - hy);
-  // same edge, forward along it: trivial
+  const H_ = (n) => Math.hypot(X[n] - e.x, Y[n] - e.y);
   if (s.k === e.k && (e.t >= s.t || !s.ow)) return { pts: [[s.x, s.y], [e.x, e.y]], len: Math.hypot(e.x - s.x, e.y - s.y) };
-  // exits from the start point
-  const startN = [[s.b, (1 - s.t) * s.len]];
-  if (!s.ow) startN.push([s.a, s.t * s.len]);
+  const startN = [[s.b, (1 - s.t) * s.len]]; if (!s.ow) startN.push([s.a, s.t * s.len]);
   for (const [n, c] of startN) { gScore.set(n, c); came.set(n, -1); push(n, c + H_(n)); }
-  // entries into the end point
-  const goal = new Map();
-  goal.set(e.a, e.t * e.len);
-  if (!e.ow) goal.set(e.b, (1 - e.t) * e.len);
+  const goal = new Map(); goal.set(e.a, e.t * e.len); if (!e.ow) goal.set(e.b, (1 - e.t) * e.len);
   let best = Infinity, bestN = -1, it = 0;
   while (heap.length && it++ < limit) {
-    const [f, n] = pop();
-    if (f >= best) break;
+    const [f, n] = pop(); if (f >= best) break;
     const gn = gScore.get(n);
     if (goal.has(n)) { const tot = gn + goal.get(n); if (tot < best) { best = tot; bestN = n; } }
     for (let i = off[n]; i < off[n + 1]; i++) {
@@ -337,15 +322,12 @@ function route(s, e, limit = 6000) {
   if (bestN < 0) return null;
   const pts = [[e.x, e.y]];
   for (let n = bestN; n !== -1; n = came.get(n)) pts.push([X[n], Y[n]]);
-  pts.push([s.x, s.y]);
-  pts.reverse();
+  pts.push([s.x, s.y]); pts.reverse();
   return { pts, len: best };
 }
-
 function roadPath(x0, y0, x1, y1) {
   const straight = Math.hypot(x1 - x0, y1 - y0);
-  if (!G || straight < 1.5) return { pts: [[x0, y0], [x1, y1]], len: straight };
-  if (straight > 900) return { pts: [[x0, y0], [x1, y1]], len: straight };  // big jump: teleport-ish
+  if (!G || straight < 1.5 || straight > 900) return { pts: [[x0, y0], [x1, y1]], len: straight };
   const S = snap(x0, y0), E = snap(x1, y1);
   let best = null;
   for (const s of S.slice(0, 2)) for (const e of E.slice(0, 2)) {
@@ -356,7 +338,6 @@ function roadPath(x0, y0, x1, y1) {
   best.pts.unshift([x0, y0]); best.pts.push([x1, y1]);
   return best;
 }
-
 function along(path, d) {
   const p = path.pts;
   for (let i = 1; i < p.length; i++) {
@@ -372,113 +353,70 @@ function along(path, d) {
 }
 
 // ================================================================ LIVE BUSES
-const buses = new Map();   // id -> bus
+const buses = new Map();
 let lastPoll = 0, lastOk = 0, polling = false;
-
 function busFrom(v) {
-  const line = v.service?.line_name || "?";
   const fleet = v.vehicle?.name || `#${v.id}`;
   return {
-    id: v.id, line, fleet, dest: v.destination || "", dd: /double/i.test(v.vehicle?.features || ""),
-    features: v.vehicle?.features || "", livery: v.vehicle?.colour || null, url: v.vehicle?.url || "",
-    serviceUrl: v.service?.url || "", persona: persona(fleet),
-    x: 0, y: 0, ang: 0, path: null, t0: 0, dur: 1, trail: [], lastSeen: 0, kmh: null,
-    feedTime: 0, fx: 0, fy: 0, fade: 1,
+    id: v.id, line: v.service?.line_name || "?", fleet, dest: v.destination || "",
+    dd: /double/i.test(v.vehicle?.features || ""), features: v.vehicle?.features || "",
+    url: v.vehicle?.url || "", persona: persona(fleet),
+    x: 0, y: 0, ang: 0, path: null, t0: 0, dur: 1, lastSeen: 0, kmh: null, feedTime: 0, fx: 0, fy: 0, fade: 1,
   };
 }
-
 async function poll() {
-  // background tabs still poll, just rarely (and always once, so first paint is never empty)
+  // background tabs still poll, rarely (and always once, so the first paint is never empty)
   if (polling || (document.hidden && lastOk && Date.now() - lastPoll < 60000)) return;
   polling = true;
   try {
     const r = await fetch(LIVE_URL(META), { cache: "no-store" });
     if (!r.ok) throw new Error(r.status);
     const list = await r.json();
-    const now = performance.now();
-    const seen = new Set();
+    const now = performance.now(), seen = new Set();
     for (const v of list) {
       if (!v.coordinates) continue;
-      const [lon, lat] = v.coordinates;
-      const [x, y] = proj(lat, lon);
+      const [x, y] = proj(v.coordinates[1], v.coordinates[0]);
       if (x < -50 || y < -50 || x > META.W + 50 || y > META.H + 50) continue;
       seen.add(v.id);
       let b = buses.get(v.id);
       const ft = Date.parse(v.datetime) || Date.now();
       if (!b) {
         b = busFrom(v); buses.set(v.id, b);
-        b.x = x; b.y = y; b.fx = x; b.fy = y; b.feedTime = ft;
-        b.ang = ((v.heading ?? 0) - 90) * Math.PI / 180; b.fade = 0;
+        b.x = b.fx = x; b.y = b.fy = y; b.feedTime = ft; b.fade = 0;
+        b.ang = ((v.heading ?? 0) - 90) * Math.PI / 180;
       } else {
-        // refresh labels (route can change mid-day)
-        b.line = v.service?.line_name || b.line; b.dest = v.destination || b.dest;
+        b.line = v.service?.line_name || b.line; b.dest = v.destination || b.dest; b.gone = false;
         if (ft > b.feedTime && (Math.abs(x - b.fx) > 0.3 || Math.abs(y - b.fy) > 0.3)) {
-          const dtS = (ft - b.feedTime) / 1000;
-          const p = roadPath(b.x, b.y, x, y);
+          const dtS = (ft - b.feedTime) / 1000, p = roadPath(b.x, b.y, x, y);
           if (dtS > 4) {
-            // road distance, but never trust a detour more than 1.6x the straight line
-            const d = Math.min(p.len, Math.hypot(x - b.fx, y - b.fy) * 1.6 + 5);
-            const v = metres(d) / dtS * 3.6;
-            if (v < 105) b.kmh = b.kmh == null ? v : b.kmh * 0.5 + v * 0.5;   // drop GPS jumps, smooth the rest
+            // road distance, never trusting a detour beyond 1.6x the straight line
+            const d = Math.min(p.len, Math.hypot(x - b.fx, y - b.fy) * 1.6 + 5), v_ = metres(d) / dtS * 3.6;
+            if (v_ < 105) b.kmh = b.kmh == null ? v_ : b.kmh * 0.5 + v_ * 0.5;
           }
           b.path = p; b.t0 = now; b.dur = Math.max(POLL_MS * 0.95, 4000);
           b.fx = x; b.fy = y; b.feedTime = ft;
-        } else if (ft > b.feedTime) { b.feedTime = ft; b.kmh = 0; }
+        } else if (ft > b.feedTime) { b.feedTime = ft; b.kmh = b.kmh == null ? 0 : b.kmh * 0.5; }
       }
-      b.lastSeen = now; b.heading = v.heading;
+      b.lastSeen = now;
     }
-    for (const [id, b] of buses) if (!seen.has(id) && now - b.lastSeen > POLL_MS * 4) b.gone = true;
+    for (const b of buses.values()) if (!seen.has(b.id) && now - b.lastSeen > POLL_MS * 4) b.gone = true;
     lastOk = Date.now();
     onLiveUpdate();
-  } catch (e) {
-    console.warn("poll failed", e);
-  } finally { polling = false; lastPoll = Date.now(); }
+  } catch (e) { console.warn("poll failed", e); }
+  finally { polling = false; lastPoll = Date.now(); }
 }
-
+function lerpAng(a, b, t) { let d = b - a; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI; return a + d * t; }
 function stepBuses(now, dt) {
   for (const [id, b] of buses) {
     if (b.gone) { b.fade -= dt / 1500; if (b.fade <= 0) { buses.delete(id); if (sel?.type === "bus" && sel.id === id) closeCard(); } continue; }
     b.fade = Math.min(1, b.fade + dt / 600);
     if (b.path) {
-      const t = clamp((now - b.t0) / b.dur, 0, 1);
-      const ease = t;   // constant speed reads as "driving"
-      const p = along(b.path, b.path.len * ease);
+      const t = clamp((now - b.t0) / b.dur, 0, 1), p = along(b.path, b.path.len * t);
       if (p.ang != null) b.ang = lerpAng(b.ang, p.ang, Math.min(1, dt / 120));
       b.x = p.x; b.y = p.y;
       if (t >= 1) b.path = null;
     }
-    const tr = b.trail, last = tr[tr.length - 1];
-    if (!last || Math.hypot(last[0] - b.x, last[1] - b.y) > 2) { tr.push([b.x, b.y]); if (tr.length > 60) tr.shift(); }
   }
-}
-function lerpAng(a, b, t) { let d = b - a; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI; return a + d * t; }
-
-// ================================================================ SPRITES
-// Procedural top-down pixel buses (THE CUT draws everything with fillRect).
-const spriteCache = new Map();
-function busSprite(col, dd, livery) {
-  const key = col + dd + livery;
-  if (spriteCache.has(key)) return spriteCache.get(key);
-  const w = dd ? 15 : 14, h = 6;
-  const c = document.createElement("canvas"); c.width = w; c.height = h;
-  const g = c.getContext("2d");
-  const px = (x, y, cc, ww = 1, hh = 1) => { g.fillStyle = cc; g.fillRect(x, y, ww, hh); };
-  const dark = shade(col, 0.55), light = shade(col, 1.25);
-  px(0, 0, dark, w, h);                      // outline
-  px(1, 1, col, w - 2, h - 2);               // body
-  if (dd) px(2, 2, light, w - 5, 2);         // upper-deck roof panel
-  for (let x = 2; x < w - 3; x += 3) { px(x, 1, "#26303d", 2, 1); px(x, h - 2, "#26303d", 2, 1); }  // windows
-  px(w - 2, 1, "#1d2530", 1, h - 2);         // windscreen (front = right)
-  px(w - 3, 2, "#9fd3ff", 1, 2);             // glint
-  if (livery && /^#/.test(livery)) px(1, 3, livery, 2, 1);
-  px(4, 2, shade(col, 0.8), 2, 2);           // roof vent
-  spriteCache.set(key, c);
-  return c;
-}
-function shade(hex, f) {
-  const n = parseInt(hex.slice(1), 16);
-  const r = clamp(Math.round(((n >> 16) & 255) * f), 0, 255), g = clamp(Math.round(((n >> 8) & 255) * f), 0, 255), b = clamp(Math.round((n & 255) * f), 0, 255);
-  return `rgb(${r},${g},${b})`;
 }
 
 // ================================================================ RENDER
@@ -488,23 +426,25 @@ function resize() {
   CW = Math.round(r.width * DPR); CH = Math.round(r.height * DPR);
   cv.width = CW; cv.height = CH; cv.style.width = r.width + "px"; cv.style.height = r.height + "px";
 }
-
 function tile(c, r) {
-  const k = c + "_" + r;
+  const k = mapStyle + c + "_" + r;
   let im = tiles.get(k);
-  if (!im) { im = new Image(); im.src = `tiles/t_${c}_${r}.png`; tiles.set(k, im); }
+  if (!im) { im = new Image(); im.src = `tiles/${mapStyle}/t_${c}_${r}.png`; tiles.set(k, im); }
   return im.complete && im.naturalWidth ? im : null;
 }
-
+function overview() {
+  let o = overviews[mapStyle];
+  if (!o) { o = overviews[mapStyle] = new Image(); o.src = `tiles/${mapStyle}/overview.png`; }
+  return o.complete && o.naturalWidth ? o : null;
+}
 function drawMap() {
   ctx.imageSmoothingEnabled = false;
-  ctx.fillStyle = "#b2c07a"; ctx.fillRect(0, 0, CW, CH);
-  const z = cam.z * DPR;
-  const T = META.tile;
+  ctx.fillStyle = mapStyle === "clear" ? "#e5e9d2" : "#b2c07a"; ctx.fillRect(0, 0, CW, CH);
+  const z = cam.z * DPR, T = META.tile, ov = overview();
   const [mx0, my0] = toMap(0, 0), [mx1, my1] = toMap(CW, CH);
-  if (cam.z < 0.55 && overview && overview.complete) {
+  if (cam.z < 0.55 && ov) {
     const [sx, sy] = toScreen(0, 0);
-    ctx.drawImage(overview, Math.round(sx), Math.round(sy), Math.round(META.W * z), Math.round(META.H * z));
+    ctx.drawImage(ov, Math.round(sx), Math.round(sy), Math.round(META.W * z), Math.round(META.H * z));
     return;
   }
   const c0 = clamp(Math.floor(mx0 / T), 0, META.cols - 1), c1 = clamp(Math.floor(mx1 / T), 0, META.cols - 1);
@@ -514,143 +454,152 @@ function drawMap() {
     const sx1 = Math.floor(((c + 1) * T - cam.x) * z + CW / 2), sy1 = Math.floor(((r + 1) * T - cam.y) * z + CH / 2);
     const im = tile(c, r);
     if (im) ctx.drawImage(im, sx0, sy0, sx1 - sx0, sy1 - sy0);
-    else if (overview && overview.complete) ctx.drawImage(overview, c * T / 4, r * T / 4, T / 4, T / 4, sx0, sy0, sx1 - sx0, sy1 - sy0);
+    else if (ov) ctx.drawImage(ov, c * T / 4, r * T / 4, T / 4, T / 4, sx0, sy0, sx1 - sx0, sy1 - sy0);
   }
+}
+
+// ---- route lines (transit-map style), stroked as Path2D in map space
+function focusLines() {
+  if (sel?.type === "bus") { const b = buses.get(sel.id); return b ? new Set([b.line]) : null; }
+  if (sel?.type === "stop") { const s = STOPS.find((q) => q.id === sel.id); return s?.l?.length ? new Set(s.l) : null; }
+  if (sel?.type === "line") return new Set([sel.id]);
+  return null;
+}
+function drawRoutes() {
+  if (routesMode === "off" && !sel) return;
+  const focus = focusLines();
+  const live = new Set([...buses.values()].filter((b) => !b.gone).map((b) => b.line));
+  const z = cam.z * DPR;
+  ctx.save();
+  ctx.setTransform(z, 0, 0, z, CW / 2 - cam.x * z, CH / 2 - cam.y * z);
+  ctx.lineCap = "round"; ctx.lineJoin = "round";
+  const base = clamp(2.2 + cam.z * 0.9, 3, 7) * DPR;
+  // casings first, then colours, so overlapping lines read like a transit map, not mud
+  const shown = [...ROUTES.values()].filter((r) => !hiddenRoutes.has(r.line) && !focus?.has(r.line) &&
+    (routesMode === "all" || (routesMode === "live" && live.has(r.line))));
+  const w = base * 0.62;
+  ctx.globalAlpha = focus ? 0.25 : 1;
+  ctx.strokeStyle = focus ? "#9aa1ab" : "#ffffff"; ctx.lineWidth = (w + 3 * DPR) / z;
+  for (const r of shown) ctx.stroke(r.path);
+  ctx.lineWidth = w / z;
+  for (const r of shown) { ctx.strokeStyle = focus ? "#9aa1ab" : routeColour(r.line); ctx.stroke(r.path); }
+  ctx.globalAlpha = 1;
+  // busiest line on top when a stop has several
+  if (focus) for (const l of [...focus].sort((a, b) => (ROUTES.get(a)?.trips || 0) - (ROUTES.get(b)?.trips || 0))) {
+    const r = ROUTES.get(l); if (!r || hiddenRoutes.has(l)) continue;
+    ctx.strokeStyle = "#1b1e23"; ctx.lineWidth = (base * 1.2 + 4 * DPR) / z; ctx.stroke(r.path);
+    ctx.strokeStyle = routeColour(l); ctx.lineWidth = (base * 1.2) / z; ctx.stroke(r.path);
+  }
+  ctx.restore();
 }
 
 function drawStops() {
-  if (!showStops || cam.z < 0.7) return;
-  const big = cam.z >= 1.6;
-  const u = Math.max(1, Math.round(DPR * clamp(cam.z * 0.55, 1, 3)));
+  if (!showStops || cam.z < 0.9) return;
+  const focus = focusLines();
+  const r0 = (cam.z >= 2.2 ? 4 : 3) * DPR;
+  ctx.textAlign = "left"; ctx.textBaseline = "middle";
   for (const s of STOPS) {
     const [sx, sy] = toScreen(s.x, s.y);
-    if (sx < -30 || sy < -40 || sx > CW + 30 || sy > CH + 30) continue;
+    if (sx < -20 || sy < -20 || sx > CW + 20 || sy > CH + 20) continue;
+    const onFocus = focus && s.l?.some((l) => focus.has(l));
     const visited = PLAYER.stops[s.id];
-    const X = Math.round(sx), Y = Math.round(sy);
-    if (!big) {
-      ctx.fillStyle = "#14171d"; ctx.fillRect(X - 2 * u, Y - 2 * u, 4 * u, 4 * u);
-      ctx.fillStyle = visited ? "#e0b44a" : "#e8402f"; ctx.fillRect(X - u, Y - u, 2 * u, 2 * u);
-      continue;
-    }
-    // pole + UK bus-stop flag (red roundel on white), outlined so it reads on any ground
-    ctx.fillStyle = "rgba(0,0,0,.35)"; ctx.fillRect(X - u, Y, 4 * u, u);
-    ctx.fillStyle = "#14171d"; ctx.fillRect(X - u, Y - 7 * u, 3 * u, 7 * u);
-    ctx.fillStyle = "#cfd6e2"; ctx.fillRect(X, Y - 7 * u, u, 7 * u);
-    ctx.fillStyle = "#14171d"; ctx.fillRect(X - 3 * u, Y - 12 * u, 7 * u, 6 * u);
-    ctx.fillStyle = visited ? "#e0b44a" : "#ffffff"; ctx.fillRect(X - 2 * u, Y - 11 * u, 5 * u, 4 * u);
-    ctx.fillStyle = "#e8402f"; ctx.fillRect(X - u, Y - 10 * u, 3 * u, 2 * u);
+    const r = onFocus ? r0 + DPR : r0;
+    ctx.globalAlpha = focus && !onFocus ? 0.35 : 1;
+    // transit-map stop: white dot, black ring (gold when you've checked in)
+    ctx.fillStyle = "#1b1e23"; ctx.beginPath(); ctx.arc(sx, sy, r + 1.6 * DPR, 0, 7); ctx.fill();
+    ctx.fillStyle = visited ? "#f7d51d" : "#ffffff"; ctx.beginPath(); ctx.arc(sx, sy, r, 0, 7); ctx.fill();
     if (sel?.type === "stop" && sel.id === s.id) {
-      ctx.strokeStyle = "#e0b44a"; ctx.lineWidth = 2 * DPR; ctx.strokeRect(X - 5 * u, Y - 14 * u, 11 * u, 16 * u);
+      ctx.strokeStyle = "#1b1e23"; ctx.lineWidth = 2 * DPR; ctx.beginPath(); ctx.arc(sx, sy, r + 6 * DPR, 0, 7); ctx.stroke();
     }
-  }
-}
-
-function drawTrails() {
-  if (!showTrails || cam.z < 0.6) return;
-  ctx.lineCap = "round"; ctx.lineJoin = "round";
-  for (const b of buses.values()) {
-    if (hiddenRoutes.has(b.line) || b.trail.length < 2) continue;
-    const col = routeColour(b.line);
-    const n = b.trail.length;
-    ctx.lineWidth = Math.max(1.5, cam.z * 1.2) * DPR;
-    for (let i = 1; i < n; i++) {
-      const [x0, y0] = toScreen(...b.trail[i - 1]), [x1, y1] = toScreen(...b.trail[i]);
-      ctx.globalAlpha = (i / n) * 0.55 * b.fade;
-      ctx.strokeStyle = col; ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
+    if (cam.z >= 4.2 || (sel?.type === "stop" && sel.id === s.id)) {
+      const txt = s.name + (s.ind && s.ind.length < 9 ? ` (${s.ind})` : "");
+      label(txt, sx + r + 5 * DPR, sy, 11, "#1b1e23", "rgba(255,255,255,.92)", "left");
     }
   }
   ctx.globalAlpha = 1;
 }
 
-function busScale() { return Math.max(1, Math.round(clamp(cam.z * 0.75, 1, 4) * DPR)); }
+function label(txt, x, y, px, fill, halo, align = "center") {
+  ctx.font = `${Math.round(px * DPR)}px ${FONT}`;
+  ctx.textAlign = align; ctx.textBaseline = "middle";
+  ctx.lineWidth = 3 * DPR; ctx.lineJoin = "round"; ctx.strokeStyle = halo; ctx.strokeText(txt, x, y);
+  ctx.fillStyle = fill; ctx.fillText(txt, x, y);
+}
 
+// ---- buses: bold route badges with a direction pointer (clear > realistic)
 function drawBuses(now) {
-  const k = busScale();
+  const focus = focusLines();
   const list = [...buses.values()].filter((b) => !hiddenRoutes.has(b.line)).sort((a, b) => a.y - b.y);
+  const small = cam.z < 1.1;
+  ctx.font = `${Math.round(11 * DPR)}px ${FONT}`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
   for (const b of list) {
     const [sx, sy] = toScreen(b.x, b.y);
     if (sx < -60 || sy < -60 || sx > CW + 60 || sy > CH + 60) continue;
-    const col = routeColour(b.line);
-    if (cam.z < 1.1) {
-      // zoomed out: bold route-coloured markers instead of tiny sprites
-      const r = (cam.z < 0.6 ? 4 : 5) * DPR;
-      ctx.globalAlpha = b.fade;
-      ctx.fillStyle = "#0d0f14"; ctx.beginPath(); ctx.arc(sx, sy, r + 1.5 * DPR, 0, 7); ctx.fill();
-      ctx.fillStyle = col; ctx.beginPath(); ctx.arc(sx, sy, r, 0, 7); ctx.fill();
-      ctx.fillStyle = "#fff"; ctx.beginPath();
-      ctx.arc(sx + Math.cos(b.ang) * r * 0.55, sy + Math.sin(b.ang) * r * 0.55, 1.4 * DPR, 0, 7); ctx.fill();
-      ctx.globalAlpha = 1;
-      if (sel?.type === "bus" && sel.id === b.id) {
-        ctx.strokeStyle = "#e0b44a"; ctx.lineWidth = 2 * DPR; ctx.beginPath(); ctx.arc(sx, sy, r + 5 * DPR + Math.sin(now / 200) * 2 * DPR, 0, 7); ctx.stroke();
-      }
-      continue;
+    const col = routeColour(b.line), isSel = sel?.type === "bus" && sel.id === b.id;
+    const dim = focus && !focus.has(b.line);
+    ctx.globalAlpha = b.fade * (dim ? 0.35 : 1);
+    if (small) {
+      const r = 5 * DPR;
+      ctx.fillStyle = "#1b1e23"; ctx.fillRect(sx - r - 2 * DPR, sy - r - 2 * DPR, 2 * r + 4 * DPR, 2 * r + 4 * DPR);
+      ctx.fillStyle = col; ctx.fillRect(sx - r, sy - r, 2 * r, 2 * r);
+    } else {
+      const tw = Math.max(ctx.measureText(b.line).width, 9 * DPR);
+      const w = tw + 10 * DPR, h = 18 * DPR, R = Math.hypot(w, h) / 2 + 2 * DPR;
+      // pointer: a triangle sitting just outside the badge, on the heading
+      const a = b.ang, px = sx + Math.cos(a) * R, py = sy + Math.sin(a) * R;
+      ctx.fillStyle = "#1b1e23"; ctx.beginPath();
+      ctx.moveTo(px + Math.cos(a) * 7 * DPR, py + Math.sin(a) * 7 * DPR);
+      ctx.lineTo(px + Math.cos(a + 2.2) * 7 * DPR, py + Math.sin(a + 2.2) * 7 * DPR);
+      ctx.lineTo(px + Math.cos(a - 2.2) * 7 * DPR, py + Math.sin(a - 2.2) * 7 * DPR);
+      ctx.closePath(); ctx.fill();
+      // pixel badge: black frame, route colour, double-deckers get a second frame line
+      const x0 = Math.round(sx - w / 2), y0 = Math.round(sy - h / 2);
+      ctx.fillStyle = "#1b1e23"; ctx.fillRect(x0 - 2 * DPR, y0 - 2 * DPR, w + 4 * DPR, h + 4 * DPR);
+      ctx.fillStyle = col; ctx.fillRect(x0, y0, w, h);
+      if (b.dd) { ctx.fillStyle = "rgba(255,255,255,.55)"; ctx.fillRect(x0, y0, w, 2 * DPR); }
+      ctx.fillStyle = inkFor(col); ctx.fillText(b.line, sx, sy + DPR);
+      const d = PLAYER.dex[b.fleet];
+      if (d) { ctx.fillStyle = "#1b1e23"; ctx.fillRect(x0 + w - 3 * DPR, y0 - 5 * DPR, 8 * DPR, 8 * DPR); ctx.fillStyle = d.irl ? "#f7d51d" : "#92cc41"; ctx.fillRect(x0 + w - 1 * DPR, y0 - 3 * DPR, 4 * DPR, 4 * DPR); }
     }
-    const spr = busSprite(col, b.dd, b.livery);
-    const a = Math.round(b.ang / (Math.PI / 8)) * (Math.PI / 8);   // 16 directions = tidier pixels
-    ctx.save();
-    ctx.globalAlpha = b.fade;
-    ctx.translate(Math.round(sx), Math.round(sy));
-    // shadow
-    ctx.fillStyle = "rgba(0,0,0,.28)";
-    ctx.beginPath(); ctx.ellipse(k, k * 2, spr.width * k * 0.55, spr.height * k * 0.55, a, 0, 7); ctx.fill();
-    ctx.rotate(a);
-    ctx.drawImage(spr, Math.round(-spr.width * k / 2), Math.round(-spr.height * k / 2), spr.width * k, spr.height * k);
-    ctx.restore();
-    const isSel = sel?.type === "bus" && sel.id === b.id;
     if (isSel) {
-      const r = (spr.width * k) * 0.8 + Math.sin(now / 200) * 2 * DPR;
-      ctx.strokeStyle = "#e0b44a"; ctx.lineWidth = 2 * DPR;
+      const r = (small ? 14 : 22) * DPR + Math.sin(now / 180) * 2 * DPR;
+      ctx.globalAlpha = 1; ctx.strokeStyle = "#1b1e23"; ctx.lineWidth = 3 * DPR;
       ctx.beginPath(); ctx.arc(sx, sy, r, 0, 7); ctx.stroke();
-    }
-    if (cam.z >= 1.3 || isSel) {
-      // route tag above the bus, drawn in screen space so text stays crisp
-      const txt = b.line;
-      ctx.font = `700 ${Math.round(10 * DPR)}px ui-monospace,Menlo,Consolas,monospace`;
-      const tw = ctx.measureText(txt).width + 6 * DPR, th = 13 * DPR;
-      const tx = Math.round(sx - tw / 2), ty = Math.round(sy - spr.width * k * 0.5 - th - 3 * DPR);
-      ctx.globalAlpha = b.fade;
-      ctx.fillStyle = "rgba(13,15,20,.85)"; ctx.fillRect(tx - DPR, ty - DPR, tw + 2 * DPR, th + 2 * DPR);
-      ctx.fillStyle = col; ctx.fillRect(tx, ty, tw, th);
-      ctx.fillStyle = "#0d0f14"; ctx.textBaseline = "middle"; ctx.textAlign = "center";
-      ctx.fillText(txt, sx, ty + th / 2 + DPR * 0.5);
-      if (PLAYER.dex[b.fleet]) { ctx.fillStyle = PLAYER.dex[b.fleet].irl ? "#e0b44a" : "#5fb87a"; ctx.fillRect(tx + tw - 3 * DPR, ty - 3 * DPR, 4 * DPR, 4 * DPR); }
-      ctx.globalAlpha = 1;
+      ctx.strokeStyle = "#f7d51d"; ctx.lineWidth = 1.5 * DPR; ctx.stroke();
     }
   }
+  ctx.globalAlpha = 1;
 }
 
 function drawLabels() {
-  ctx.textAlign = "center"; ctx.textBaseline = "middle";
   for (const l of LABELS) {
-    let show = false, size = 11, col = "#f4f1e8";
-    if (l.kind === "town") { show = cam.z < 1.2; size = 16; }
-    else if (l.kind === "suburb") { show = cam.z >= 0.45 && cam.z < 3.2; size = 12; }
-    else if (l.kind === "hood") { show = cam.z >= 1.6; size = 10; }
-    else if (l.kind === "college") { show = cam.z >= 1.9; size = 10; col = "#ffe7a8"; }
-    else if (l.kind === "station") { show = cam.z >= 0.8; size = 11; col = "#bfe0ff"; }
-    else { show = cam.z >= 2.4; size = 9.5; }
+    let show = false, size = 11, txt = l.name;
+    if (l.kind === "town") { show = cam.z < 1.2; size = 22; txt = txt.toUpperCase(); }
+    else if (l.kind === "suburb") { show = cam.z >= 0.45 && cam.z < 3.2; txt = txt.toUpperCase(); }
+    else if (l.kind === "hood") show = cam.z >= 1.6;
+    else if (l.kind === "college") show = cam.z >= 2;
+    else if (l.kind === "station") show = cam.z >= 0.8;
+    else show = cam.z >= 2.6;
     if (!show) continue;
     const [sx, sy] = toScreen(l.x, l.y);
-    if (sx < -100 || sy < -30 || sx > CW + 100 || sy > CH + 30) continue;
-    ctx.font = `700 ${Math.round(size * DPR)}px ui-monospace,Menlo,Consolas,monospace`;
-    const txt = l.kind === "town" || l.kind === "suburb" ? l.name.toUpperCase() : l.name;
-    ctx.lineWidth = 3 * DPR; ctx.strokeStyle = "rgba(13,15,20,.75)"; ctx.strokeText(txt, sx, sy);
-    ctx.fillStyle = col; ctx.fillText(txt, sx, sy);
+    if (sx < -120 || sy < -30 || sx > CW + 120 || sy > CH + 30) continue;
+    label(txt, sx, sy, size, l.kind === "college" ? "#7a5a1a" : "#3a3f47", "rgba(255,255,255,.85)");
   }
 }
-
 function drawMe() {
   if (!ME) return;
-  const [x, y] = proj(ME.lat, ME.lon);
-  const [sx, sy] = toScreen(x, y);
-  const t = performance.now() / 1000;
-  ctx.strokeStyle = "rgba(74,158,224,.5)"; ctx.lineWidth = 2 * DPR;
-  ctx.beginPath(); ctx.arc(sx, sy, (CATCH_M / META.mpp) * cam.z * DPR, 0, 7); ctx.stroke();
-  ctx.fillStyle = "#4a9ee0"; ctx.beginPath(); ctx.arc(sx, sy, (5 + Math.sin(t * 3)) * DPR, 0, 7); ctx.fill();
-  ctx.strokeStyle = "#fff"; ctx.lineWidth = 2 * DPR; ctx.stroke();
+  const [x, y] = proj(ME.lat, ME.lon), [sx, sy] = toScreen(x, y);
+  ctx.strokeStyle = "rgba(32,156,238,.6)"; ctx.lineWidth = 2 * DPR; ctx.setLineDash([4 * DPR, 4 * DPR]);
+  ctx.beginPath(); ctx.arc(sx, sy, (CATCH_M / META.mpp) * cam.z * DPR, 0, 7); ctx.stroke(); ctx.setLineDash([]);
+  const s = (6 + Math.sin(performance.now() / 300)) * DPR;
+  ctx.fillStyle = "#1b1e23"; ctx.fillRect(sx - s - 2 * DPR, sy - s - 2 * DPR, 2 * s + 4 * DPR, 2 * s + 4 * DPR);
+  ctx.fillStyle = "#209cee"; ctx.fillRect(sx - s, sy - s, 2 * s, 2 * s);
 }
 
 let lastFrame = performance.now(), following = null;
+function render(now) {
+  drawMap(); drawRoutes(); drawStops(); drawBuses(now); drawMe(); drawLabels();
+}
 function frame(now) {
   const dt = Math.min(100, now - lastFrame); lastFrame = now;
   stepBuses(now, dt);
@@ -658,7 +607,7 @@ function frame(now) {
     const b = buses.get(following);
     cam.x += (b.x - cam.x) * Math.min(1, dt / 250); cam.y += (b.y - cam.y) * Math.min(1, dt / 250);
   }
-  drawMap(); drawTrails(); drawStops(); drawBuses(now); drawMe(); drawLabels();
+  render(now);
   requestAnimationFrame(frame);
 }
 
@@ -671,34 +620,31 @@ cv.addEventListener("pointerdown", (e) => {
   if (pointers.size === 1) { drag = { x: e.clientX, y: e.clientY, cx: cam.x, cy: cam.y }; moved = 0; }
   else if (pointers.size === 2) {
     const [a, b] = [...pointers.values()];
-    drag = { pinch: Math.hypot(a[0] - b[0], a[1] - b[1]), z: cam.z, cx: cam.x, cy: cam.y, mid: [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2] };
+    drag = { pinch: Math.hypot(a[0] - b[0], a[1] - b[1]), z: cam.z, mid: [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2] };
   }
 });
 cv.addEventListener("pointermove", (e) => {
-  if (!pointers.has(e.pointerId)) { hover(e); return; }
+  if (!pointers.has(e.pointerId)) { cv.style.cursor = pick(e) ? "pointer" : "grab"; return; }
   pointers.set(e.pointerId, [e.clientX, e.clientY]);
   if (!drag) return;
   if (drag.pinch && pointers.size === 2) {
     const [a, b] = [...pointers.values()];
-    const d = Math.hypot(a[0] - b[0], a[1] - b[1]);
-    zoomAt(drag.mid[0], drag.mid[1], clamp(drag.z * d / drag.pinch, 0.25, 8) / cam.z);
+    zoomAt(drag.mid[0], drag.mid[1], clamp(drag.z * Math.hypot(a[0] - b[0], a[1] - b[1]) / drag.pinch, 0.25, 8) / cam.z);
     moved = 99; return;
   }
   const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
   moved = Math.max(moved, Math.abs(dx) + Math.abs(dy));
-  if (moved > 4) { following = null; cv.classList.add("drag"); cam.x = drag.cx - dx / cam.z; cam.y = drag.cy - dy / cam.z; clampCam(); }
+  if (moved > 4) { following = null; cv.style.cursor = "grabbing"; cam.x = drag.cx - dx / cam.z; cam.y = drag.cy - dy / cam.z; clampCam(); }
 });
 const up = (e) => {
   pointers.delete(e.pointerId);
-  cv.classList.remove("drag");
-  if (pointers.size === 0) { if (drag && !drag.pinch && moved <= 4) click(e); drag = null; }
+  if (pointers.size === 0) { if (drag && !drag.pinch && moved <= 4) { const p = pick(e); if (p) select(p); else if (sel) closeCard(); } drag = null; }
   else if (pointers.size === 1) { const [p] = [...pointers.values()]; drag = { x: p[0], y: p[1], cx: cam.x, cy: cam.y }; moved = 99; }
 };
 cv.addEventListener("pointerup", up); cv.addEventListener("pointercancel", up);
 cv.addEventListener("wheel", (e) => { e.preventDefault(); zoomAt(e.clientX, e.clientY, Math.exp(-e.deltaY * 0.0015)); }, { passive: false });
 function zoomAt(clientX, clientY, f) {
-  const r = cv.getBoundingClientRect();
-  const sx = (clientX - r.left) * DPR, sy = (clientY - r.top) * DPR;
+  const r = cv.getBoundingClientRect(), sx = (clientX - r.left) * DPR, sy = (clientY - r.top) * DPR;
   const [mx, my] = toMap(sx, sy);
   cam.z = clamp(cam.z * f, 0.25, 8);
   const [mx2, my2] = toMap(sx, sy);
@@ -706,72 +652,60 @@ function zoomAt(clientX, clientY, f) {
 }
 function clampCam() { cam.x = clamp(cam.x, 0, META.W); cam.y = clamp(cam.y, 0, META.H); }
 window.addEventListener("keydown", (e) => {
-  if (e.target.tagName === "INPUT") return;
   const r = cv.getBoundingClientRect(), cx = r.left + r.width / 2, cy = r.top + r.height / 2;
   if (e.key === "+" || e.key === "=") zoomAt(cx, cy, 1.25);
   if (e.key === "-") zoomAt(cx, cy, 0.8);
   if (e.key === "Escape") closeCard();
 });
-
 function pick(e) {
-  const r = cv.getBoundingClientRect();
-  const sx = (e.clientX - r.left) * DPR, sy = (e.clientY - r.top) * DPR;
+  const r = cv.getBoundingClientRect(), sx = (e.clientX - r.left) * DPR, sy = (e.clientY - r.top) * DPR;
   let best = null, bd = 22 * DPR;
   for (const b of buses.values()) {
     if (hiddenRoutes.has(b.line)) continue;
-    const [bx, by] = toScreen(b.x, b.y);
-    const d = Math.hypot(bx - sx, by - sy);
+    const [bx, by] = toScreen(b.x, b.y), d = Math.hypot(bx - sx, by - sy);
     if (d < bd) { bd = d; best = { type: "bus", id: b.id }; }
   }
   if (best) return best;
-  if (showStops && cam.z >= 0.7) {
-    bd = 16 * DPR;
+  if (showStops && cam.z >= 0.9) {
+    bd = 12 * DPR;
     for (const s of STOPS) {
-      const [x, y] = toScreen(s.x, s.y);
-      const u = Math.max(1, Math.round(DPR * clamp(cam.z * 0.55, 1, 3)));
-      const d = Math.hypot(x - sx, y - (cam.z >= 1.6 ? sy + 8 * u : sy));
+      const [x, y] = toScreen(s.x, s.y), d = Math.hypot(x - sx, y - sy);
       if (d < bd) { bd = d; best = { type: "stop", id: s.id }; }
     }
   }
   return best;
 }
-function hover(e) { cv.style.cursor = pick(e) ? "pointer" : "grab"; }
-function click(e) { const p = pick(e); if (p) select(p); }
 
 // ================================================================ PLAYER / GAME
 const KEY = "theroute_v1";
-const PLAYER = load();
-function load() {
+const PLAYER = (() => {
   const d = { xp: 0, dex: {}, stops: {}, routes: {}, missions: null, spotsToday: {}, intro: false };
-  try { return Object.assign(d, JSON.parse(localStorage.getItem(KEY) || "{}")); } catch { return d; }
-}
-function save() { try { localStorage.setItem(KEY, JSON.stringify(PLAYER)); } catch {} }
-
+  try { return Object.assign(d, JSON.parse(recall(KEY) || "{}")); } catch { return d; }
+})();
+const save = () => store(KEY, JSON.stringify(PLAYER));
 const TITLES = ["Rookie Spotter", "Stop Hopper", "Route Rookie", "Timetable Tactician", "Busway Baron",
   "Citi Champion", "Depot Legend", "Fenland Phantom", "Lord of the Lines", "The Route Itself"];
 const xpFor = (lv) => 60 * (lv - 1) * (lv - 1) + 40 * (lv - 1);
 function level() { let lv = 1; while (PLAYER.xp >= xpFor(lv + 1)) lv++; return lv; }
+const title = () => TITLES[Math.min(level() - 1, TITLES.length - 1)];
 function renderLevel() {
   const lv = level(), a = xpFor(lv), b = xpFor(lv + 1);
   $("lvN").textContent = lv;
-  $("lvBar").style.width = `${((PLAYER.xp - a) / (b - a)) * 100}%`;
-  $("lvT").textContent = `${TITLES[Math.min(lv - 1, TITLES.length - 1)]} · ${PLAYER.xp} xp`;
+  $("lvBar").value = ((PLAYER.xp - a) / (b - a)) * 100;
+  $("lvT").textContent = `${title()} · ${PLAYER.xp} XP`;
 }
 function gain(xp, why) {
   const before = level();
   PLAYER.xp += xp; save(); renderLevel();
   toast(`+${xp} XP · ${why}`);
-  if (level() > before) setTimeout(() => toast(`LEVEL ${level()} · ${TITLES[Math.min(level() - 1, TITLES.length - 1)]}`), 1400);
+  if (level() > before) setTimeout(() => toast(`LEVEL UP! LV ${level()} · ${title()}`), 1500);
 }
-
 function spot(b, irl) {
-  const d = today();
-  const entry = PLAYER.dex[b.fleet];
-  const tKey = b.fleet + (irl ? ":irl" : "");
+  const d = today(), entry = PLAYER.dex[b.fleet], tKey = b.fleet + (irl ? ":irl" : "");
   if (PLAYER.spotsToday.date !== d) PLAYER.spotsToday = { date: d };
-  if (PLAYER.spotsToday[tKey]) { toast(irl ? "Already caught this one today" : "Already spotted today. Try again tomorrow"); return; }
+  if (PLAYER.spotsToday[tKey]) { toast(irl ? "Already caught this one today" : "Already spotted today. Come back tomorrow"); return; }
   PLAYER.spotsToday[tKey] = 1;
-  let xp = 0, why = [];
+  let xp = 0; const why = [];
   if (!entry) {
     PLAYER.dex[b.fleet] = { name: b.persona.name, routes: [b.line], n: 1, first: Date.now(), dd: b.dd, irl: !!irl, line: b.line };
     xp += irl ? 60 : 12; why.push(irl ? "caught in real life!" : "new bus");
@@ -787,7 +721,6 @@ function spot(b, irl) {
   gain(xp, why.join(" · "));
   renderCard(); renderPanel();
 }
-
 function checkIn(s) {
   if (PLAYER.stops[s.id]) { toast("Already checked in here"); return; }
   PLAYER.stops[s.id] = Date.now();
@@ -795,19 +728,16 @@ function checkIn(s) {
   gain(25, `checked in at ${s.name}`);
   renderCard(); renderPanel();
 }
-
-// ---- daily missions (seeded by date, built from what's actually running)
 function ensureMissions() {
   const d = today();
   if (PLAYER.missions?.date === d) return;
   const lines = [...new Set([...buses.values()].map((b) => b.line).filter((l) => l && l !== "?"))];
-  if (!lines.length) return;                    // wait for the first live poll
-  const h = hash(d);
-  const pickLine = lines[h % lines.length];
+  if (!lines.length) return;
+  const h = hash(d), pickLine = lines[h % lines.length];
   const third = [
     { id: "dd", text: "Spot 2 double-deckers", goal: 2, xp: 40 },
     { id: "checkin", text: "Check in at a real bus stop (GPS)", goal: 1, xp: 80 },
-    { id: "catch", text: "Catch a bus in real life (stand within 80 m)", goal: 1, xp: 120 },
+    { id: "catch", text: "Catch a bus in real life (within 80 m)", goal: 1, xp: 120 },
     { id: "routes", text: "Spot buses on 4 different routes", goal: 4, xp: 50 },
   ][(h >>> 4) % 4];
   PLAYER.missions = { date: d, list: [
@@ -820,16 +750,17 @@ function ensureMissions() {
 function missionEvent(kind, obj) {
   ensureMissions();
   const M = PLAYER.missions; if (!M) return;
+  const bus = kind === "spot" || kind === "catch";
   for (const m of M.list) {
     if (m.p >= m.goal) continue;
     let hit = false;
-    if (m.id === "spot" && (kind === "spot" || kind === "catch") && !m.seen.includes(obj.fleet)) { m.seen.push(obj.fleet); hit = true; }
-    if (m.id === "line" && (kind === "spot" || kind === "catch") && obj.line === m.line) hit = true;
-    if (m.id === "dd" && (kind === "spot" || kind === "catch") && obj.dd && !m.seen.includes(obj.fleet)) { m.seen.push(obj.fleet); hit = true; }
-    if (m.id === "routes" && (kind === "spot" || kind === "catch") && !m.seen.includes(obj.line)) { m.seen.push(obj.line); hit = true; }
+    if (m.id === "spot" && bus && !m.seen.includes(obj.fleet)) { m.seen.push(obj.fleet); hit = true; }
+    if (m.id === "line" && bus && obj.line === m.line) hit = true;
+    if (m.id === "dd" && bus && obj.dd && !m.seen.includes(obj.fleet)) { m.seen.push(obj.fleet); hit = true; }
+    if (m.id === "routes" && bus && !m.seen.includes(obj.line)) { m.seen.push(obj.line); hit = true; }
     if (m.id === "checkin" && kind === "checkin") hit = true;
     if (m.id === "catch" && kind === "catch") hit = true;
-    if (hit) { m.p++; if (m.p >= m.goal) setTimeout(() => gain(m.xp, `mission done: ${m.text}`), 1600); }
+    if (hit) { m.p++; if (m.p >= m.goal) setTimeout(() => gain(m.xp, `quest complete: ${m.text}`), 1700); }
   }
   save();
 }
@@ -837,201 +768,180 @@ function missionEvent(kind, obj) {
 // ---- GPS: real-world catching
 let ME = null, watchId = null;
 $("bGps").onclick = () => {
-  if (watchId != null) { navigator.geolocation.clearWatch(watchId); watchId = null; ME = null; $("bGps").classList.remove("on"); toast("GPS off"); return; }
+  if (watchId != null) { navigator.geolocation.clearWatch(watchId); watchId = null; ME = null; $("bGps").classList.remove("is-primary"); toast("GPS off"); return; }
   if (!navigator.geolocation) { toast("No GPS on this device"); return; }
   watchId = navigator.geolocation.watchPosition((p) => {
     const first = !ME;
     ME = { lat: p.coords.latitude, lon: p.coords.longitude, acc: p.coords.accuracy };
-    const [x, y] = proj(ME.lat, ME.lon);
     if (first) {
-      $("bGps").classList.add("on");
-      if (x >= 0 && y >= 0 && x <= META.W && y <= META.H) { cam.x = x; cam.y = y; cam.z = Math.max(cam.z, 2.5); toast("You're on the map. Find a bus!"); }
-      else toast("You're outside the Cambridge map. Catching only works in town");
+      $("bGps").classList.add("is-primary");
+      const [x, y] = proj(ME.lat, ME.lon);
+      if (x >= 0 && y >= 0 && x <= META.W && y <= META.H) { cam.x = x; cam.y = y; cam.z = Math.max(cam.z, 2.5); toast("You're on the map. Go find a bus!"); }
+      else toast("You're outside the map. Catching only works in Cambridge");
     }
     renderCard();
   }, () => toast("Location blocked. Allow it in your browser settings"), { enableHighAccuracy: true, maximumAge: 5000 });
 };
-function distM(lat1, lon1, lat2, lon2) {
-  const dx = (lon2 - lon1) * META.mPerDegLon, dy = (lat2 - lat1) * META.mPerDegLat; return Math.hypot(dx, dy);
-}
+const distM = (lat1, lon1, lat2, lon2) => Math.hypot((lon2 - lon1) * META.mPerDegLon, (lat2 - lat1) * META.mPerDegLat);
 function meTo(x, y) { if (!ME) return null; const [la, lo] = unproj(x, y); return distM(ME.lat, ME.lon, la, lo); }
 
 // ================================================================ UI: card
 let sel = null;
 function select(p) { sel = p; following = null; renderCard(); }
 function closeCard() { sel = null; following = null; renderCard(); }
-
-function nearestStopName(x, y) {
+function nearestStop(x, y) {
   let best = null, bd = 1e9;
   for (const s of STOPS) { const d = Math.hypot(s.x - x, s.y - y); if (d < bd) { bd = d; best = s; } }
   return best && bd < 60 ? best : null;
 }
-
 function renderCard() {
   const el = $("card");
-  if (!sel) { el.classList.remove("show"); el.innerHTML = ""; return; }
+  if (!sel || sel.type === "line") { el.classList.remove("show"); el.innerHTML = ""; return; }
   el.classList.add("show");
   if (sel.type === "bus") {
     const b = buses.get(sel.id);
     if (!b) { closeCard(); return; }
-    const col = routeColour(b.line), d = PLAYER.dex[b.fleet];
-    const near = nearestStopName(b.x, b.y);
-    const dm = meTo(b.x, b.y);
-    const canCatch = dm != null && dm <= CATCH_M + (ME?.acc > 30 ? 30 : ME?.acc || 0);
+    const d = PLAYER.dex[b.fleet], near = nearestStop(b.x, b.y), dm = meTo(b.x, b.y);
+    const canCatch = dm != null && dm <= CATCH_M + Math.min(ME?.acc || 0, 30);
     const spottedToday = PLAYER.spotsToday.date === today() && PLAYER.spotsToday[b.fleet];
+    const R = ROUTES.get(b.line);
     el.innerHTML = `
-      <div class="top"><span class="route" style="background:${col}">${esc(b.line)}</span>
-        <h2>→ ${esc(b.dest || "not in service")}</h2><span class="x" id="cx">✕</span></div>
+      <p class="title">BUS</p>
+      <div class="head">${pill(b.line, true)}<h2>→ ${esc(b.dest || "not in service")}${R?.heads?.length ? `<br><span class="muted">${esc(R.heads.slice(0, 2).join(" ⇄ "))}</span>` : ""}</h2><span class="x" id="cx">✕</span></div>
       <div class="who">${esc(b.persona.name)}</div>
-      <div class="trait">"${esc(b.persona.trait)}"</div>
+      <div class="nes-balloon from-left is-dark"><p style="margin:0">"${esc(b.persona.trait)}"</p></div>
       <div class="kv">
         <span>vehicle</span><span>${esc(b.fleet)}</span>
         <span>type</span><span>${esc(b.features || "single deck")}</span>
         <span>speed</span><span>${b.kmh == null ? "measuring…" : Math.round(b.kmh) + " km/h"}</span>
         <span>near</span><span>${near ? esc(near.name) + (near.ind ? " (" + esc(near.ind) + ")" : "") : "between stops"}</span>
         ${dm != null ? `<span>you</span><span>${dm < 1000 ? Math.round(dm) + " m away" : (dm / 1000).toFixed(1) + " km away"}</span>` : ""}
-        <span>busdex</span><span>${d ? `spotted ${d.n}× · ${d.routes.length} route(s)${d.irl ? " · <span class=gold>caught IRL</span>" : ""}` : "<span class=muted>not spotted yet</span>"}</span>
+        <span>busdex</span><span>${d ? `spotted ${d.n}× · ${d.routes.length} route(s)${d.irl ? ' · <span class="gold">caught IRL ★</span>' : ""}` : '<span class="muted">not spotted yet</span>'}</span>
       </div>
       <div class="acts">
-        <button class="btn ${spottedToday ? "done" : "go"}" id="aSpot">${spottedToday ? "✓ spotted today" : "◉ spot it"}</button>
-        ${canCatch ? `<button class="btn go" id="aCatch">★ CATCH (you're here!)</button>` : ""}
-        <button class="btn" id="aFollow">${following === b.id ? "◼ stop following" : "▶ follow"}</button>
-        <a class="btn" href="https://bustimes.org${esc(b.url)}" target="_blank" rel="noopener">history ↗</a>
+        <button class="nes-btn ${spottedToday ? "is-disabled" : "is-warning"}" id="aSpot">${spottedToday ? "✓ SPOTTED" : "◉ SPOT IT"}</button>
+        ${canCatch ? `<button class="nes-btn is-success" id="aCatch">★ CATCH!</button>` : ""}
+        <button class="nes-btn" id="aFollow">${following === b.id ? "◼ STOP" : "▶ FOLLOW"}</button>
+        <a class="nes-btn" href="https://bustimes.org${esc(b.url)}" target="_blank" rel="noopener">history ↗</a>
       </div>`;
-    $("aSpot").onclick = () => spot(b, false);
+    if (!spottedToday) $("aSpot").onclick = () => spot(b, false);
     if (canCatch) $("aCatch").onclick = () => spot(b, true);
     $("aFollow").onclick = () => { following = following === b.id ? null : b.id; if (following) cam.z = Math.max(cam.z, 2.5); renderCard(); };
   } else {
     const s = STOPS.find((q) => q.id === sel.id);
     if (!s) { closeCard(); return; }
-    // buses coming this way: within 1.5 km, and getting closer
-    const near = [...buses.values()].map((b) => {
+    const serves = new Set(s.l || []);
+    const near = [...buses.values()].filter((b) => !b.gone).map((b) => {
       const d = metres(Math.hypot(b.x - s.x, b.y - s.y));
       const toward = Math.cos(Math.atan2(s.y - b.y, s.x - b.x) - b.ang) > 0.2;
-      const eta = d / ((b.kmh && b.kmh > 4 ? b.kmh : 16) / 3.6) / 60;
-      return { b, d, toward, eta };
-    }).filter((q) => q.d < 1500 && (q.toward || q.d < 120)).sort((a, b) => a.d - b.d).slice(0, 6);
-    const dm = meTo(s.x, s.y);
-    const can = dm != null && dm <= CHECKIN_M + Math.min(ME?.acc || 0, 30);
-    const done = PLAYER.stops[s.id];
+      return { b, d, toward, eta: d / ((b.kmh > 4 ? b.kmh : 16) / 3.6) / 60, serves: serves.has(b.line) };
+    }).filter((q) => q.d < 2500 && (q.serves || !serves.size) && (q.toward || q.d < 120))
+      .sort((a, b) => a.d - b.d).slice(0, 6);
+    const dm = meTo(s.x, s.y), can = dm != null && dm <= CHECKIN_M + Math.min(ME?.acc || 0, 30), done = PLAYER.stops[s.id];
     el.innerHTML = `
-      <div class="top"><span class="route" style="background:#d33a2c;color:#fff">BUS</span>
-        <h2>${esc(s.name)}${s.ind ? ` <span class="muted">(${esc(s.ind)})</span>` : ""}</h2><span class="x" id="cx">✕</span></div>
-      <div class="kv">
-        <span>street</span><span>${esc(s.street || "—")}</span>
-        <span>area</span><span>${esc(s.loc || "—")}</span>
-        ${s.b ? `<span>faces</span><span>${esc(s.b)}</span>` : ""}
-        <span>stop id</span><span>${esc(s.id)}</span>
-        ${dm != null ? `<span>you</span><span>${Math.round(dm)} m away</span>` : ""}
-      </div>
-      <h3 style="font-size:10px;letter-spacing:2px;color:var(--dim);margin-top:9px">HEADING THIS WAY</h3>
-      <ul>${near.length ? near.map((q) => `<li data-id="${q.b.id}"><span class="pill" style="background:${routeColour(q.b.line)}">${esc(q.b.line)}</span>
-        <span>${esc(q.b.dest)}</span><span class="muted" style="margin-left:auto">${q.d < 120 ? "here now" : "~" + Math.max(1, Math.round(q.eta)) + " min"}</span></li>`).join("")
-        : `<li class="muted" style="cursor:default">no live buses close by right now</li>`}</ul>
+      <p class="title">STOP</p>
+      <div class="head"><span class="rt big" style="background:#fff">⬤</span><h2>${esc(s.name)}${s.ind ? ` <span class="muted">(${esc(s.ind)})</span>` : ""}<br><span class="muted">${esc(s.street || s.loc || "")}</span></h2><span class="x" id="cx">✕</span></div>
+      <h3>ROUTES HERE</h3>
+      <div class="chips">${(s.l || []).map((l) => `<span class="chip" data-line="${esc(l)}" style="background:${routeColour(l)};color:${inkFor(routeColour(l))}">${esc(l)}</span>`).join("") || '<span class="muted">no timetabled routes</span>'}</div>
+      <h3>COMING THIS WAY</h3>
+      <ul class="list">${near.length ? near.map((q) => `<li data-id="${q.b.id}">${pill(q.b.line)}<span>${esc(q.b.dest)}</span><span class="r">${q.d < 120 ? "HERE" : "~" + Math.max(1, Math.round(q.eta)) + " min"}</span></li>`).join("")
+        : '<li class="muted" style="cursor:default">no live buses heading here right now</li>'}</ul>
+      ${dm != null ? `<p class="muted" style="margin:10px 0 0">you are ${Math.round(dm)} m away</p>` : ""}
       <div class="acts">
-        ${done ? `<button class="btn done">✓ checked in</button>` : can ? `<button class="btn go" id="aCheck">★ CHECK IN (+25)</button>` : `<button class="btn" disabled title="Go there in real life with GPS on">check in: go there with GPS</button>`}
-        <a class="btn" href="https://bustimes.org/stops/${esc(s.id)}" target="_blank" rel="noopener">timetable ↗</a>
+        ${done ? `<button class="nes-btn is-disabled">✓ CHECKED IN</button>` : can ? `<button class="nes-btn is-success" id="aCheck">★ CHECK IN +25</button>` : `<button class="nes-btn is-disabled" title="Go there in real life with GPS on">CHECK IN: GO THERE</button>`}
+        <a class="nes-btn" href="https://bustimes.org/stops/${esc(s.id)}" target="_blank" rel="noopener">times ↗</a>
       </div>`;
     if (can && !done) $("aCheck").onclick = () => checkIn(s);
     el.querySelectorAll("li[data-id]").forEach((li) => li.onclick = () => select({ type: "bus", id: +li.dataset.id }));
+    el.querySelectorAll("[data-line]").forEach((c) => c.onclick = () => focusLine(c.dataset.line));
   }
   $("cx").onclick = closeCard;
 }
 
 // ================================================================ UI: panel
 let tab = "live";
-document.querySelectorAll("nav button").forEach((b) => b.onclick = () => {
-  tab = b.dataset.tab; document.querySelectorAll("nav button").forEach((x) => x.classList.toggle("on", x === b)); renderPanel();
+document.querySelectorAll(".tabs .nes-btn").forEach((b) => b.onclick = () => {
+  tab = b.dataset.tab;
+  document.querySelectorAll(".tabs .nes-btn").forEach((x) => x.classList.toggle("is-warning", x === b));
+  renderPanel();
 });
-
 function liveStats() {
   const by = new Map();
   for (const b of buses.values()) {
     if (b.gone) continue;
-    let r = by.get(b.line); if (!r) by.set(b.line, r = { line: b.line, n: 0, speeds: [], dests: new Set(), list: [] });
-    r.n++; r.list.push(b); if (b.kmh != null) r.speeds.push(b.kmh); if (b.dest) r.dests.add(b.dest);
+    let r = by.get(b.line); if (!r) by.set(b.line, r = { line: b.line, n: 0, speeds: [], dests: new Set() });
+    r.n++; if (b.kmh != null) r.speeds.push(b.kmh); if (b.dest) r.dests.add(b.dest);
   }
   for (const r of by.values()) r.avg = r.speeds.length ? r.speeds.reduce((a, b) => a + b, 0) / r.speeds.length : null;
   return [...by.values()];
 }
-
 function renderPanel() {
   const P = $("panel");
   if (tab === "live") {
     const rs = liveStats().sort((a, b) => b.n - a.n || String(a.line).localeCompare(b.line));
-    const all = [...buses.values()].filter((b) => !b.gone);
-    const moving = all.filter((b) => b.kmh != null);
+    const all = [...buses.values()].filter((b) => !b.gone), moving = all.filter((b) => b.kmh != null);
     const fast = moving.slice().sort((a, b) => b.kmh - a.kmh)[0];
-    const stuck = moving.filter((b) => b.kmh < 3).length;
     const ranked = rs.filter((r) => r.avg != null).sort((a, b) => b.avg - a.avg);
+    const top = ranked[0]?.avg || 1;
     P.innerHTML = `
-      <div class="stat"><div><b>${all.length}</b><span>buses live</span></div><div><b>${rs.length}</b><span>routes running</span></div><div><b>${stuck}</b><span>stopped / stuck</span></div></div>
-      ${fast && fast.kmh > 1 ? `<div class="row click" data-id="${fast.id}"><span class="pill" style="background:${routeColour(fast.line)}">${esc(fast.line)}</span><span class="grow">⚡ fastest now: ${esc(fast.persona.name)}</span><span class="v">${Math.round(fast.kmh)} km/h</span></div>` : ""}
-      <h3>ROUTE RACE: AVERAGE SPEED RIGHT NOW</h3>
-      ${ranked.length ? ranked.map((r, i) => `<div class="row click" data-line="${esc(r.line)}"><span class="n">${i + 1}</span><span class="pill" style="background:${routeColour(r.line)}">${esc(r.line)}</span><span class="grow">${esc([...r.dests].slice(0, 2).join(" ⇄ "))}</span><span class="v">${Math.round(r.avg)} km/h</span></div>`).join("")
-        : `<div class="muted">Measuring. Speeds appear once buses report their second position (~30 s).</div>`}
+      <div class="stats"><div><b>${all.length}</b><span>buses live</span></div><div><b>${rs.length}</b><span>routes</span></div><div><b>${moving.filter((b) => b.kmh < 3).length}</b><span>stopped</span></div></div>
+      ${fast && fast.kmh > 1 ? `<div class="row click" data-id="${fast.id}">${pill(fast.line)}<span class="g">⚡ fastest: ${esc(fast.persona.name)}</span><span class="v">${Math.round(fast.kmh)} km/h</span></div>` : ""}
+      <h3>ROUTE RACE · AVG SPEED NOW</h3>
+      ${ranked.length ? ranked.map((r, i) => `<div class="row click" data-line="${esc(r.line)}"><span class="n">${i + 1}</span>${pill(r.line)}<span class="g">${esc([...r.dests].slice(0, 2).join(" ⇄ "))}</span><span class="bar"><i style="width:${(r.avg / top) * 100}%"></i></span><span class="v">${Math.round(r.avg)}</span></div>`).join("")
+        : `<p class="muted">Measuring. Speeds appear once buses report a second position (~30 s).</p>`}
       <h3>ON THE ROAD</h3>
-      ${rs.map((r) => `<div class="row click" data-line="${esc(r.line)}"><span class="pill" style="background:${routeColour(r.line)}">${esc(r.line)}</span><span class="grow">${esc([...r.dests].join(" · ") || "—")}</span><span class="v">${r.n} bus${r.n > 1 ? "es" : ""}</span></div>`).join("")}
-      <p class="muted" style="margin-top:12px">Live data: <a class="gold" href="https://bustimes.org" target="_blank" rel="noopener">bustimes.org</a> / Bus Open Data Service (OGL). Map © OpenStreetMap contributors. Stops: NaPTAN.</p>`;
+      ${rs.map((r) => `<div class="row click" data-line="${esc(r.line)}">${pill(r.line)}<span class="g">${esc([...r.dests].join(" · ") || "—")}</span><span class="v">${r.n}×</span></div>`).join("")}
+      <p class="muted" style="margin-top:16px">Live: <a href="https://bustimes.org" target="_blank" rel="noopener">bustimes.org</a> / Bus Open Data Service (OGL) · routes: BODS timetables · map: OpenStreetMap contributors · stops: NaPTAN</p>`;
     P.querySelectorAll("[data-id]").forEach((r) => r.onclick = () => { select({ type: "bus", id: +r.dataset.id }); following = +r.dataset.id; cam.z = Math.max(cam.z, 2.5); renderCard(); });
     P.querySelectorAll("[data-line]").forEach((r) => r.onclick = () => focusLine(r.dataset.line));
   } else if (tab === "missions") {
     ensureMissions();
-    const M = PLAYER.missions;
-    const visited = Object.keys(PLAYER.stops).length;
-    P.innerHTML = `<h3>TODAY · ${today()}</h3>` + (M ? M.list.map((m) => `
-      <div class="mission ${m.p >= m.goal ? "done" : ""}"><div class="t"><span>${m.p >= m.goal ? "✓ " : ""}${esc(m.text)}</span><span class="xp">+${m.xp}</span></div>
-      <div class="pb"><i style="width:${Math.min(100, (m.p / m.goal) * 100)}%"></i></div><div class="muted" style="margin-top:3px">${Math.min(m.p, m.goal)} / ${m.goal}</div></div>`).join("")
-      : `<div class="muted">Missions unlock once the first live buses load.</div>`) + `
+    const M = PLAYER.missions, visited = Object.keys(PLAYER.stops).length;
+    P.innerHTML = `<h3 style="margin-top:4px">TODAY'S QUESTS · ${today()}</h3>` + (M ? M.list.map((m) => `
+      <div class="mission ${m.p >= m.goal ? "done" : ""}"><div class="t"><span>${m.p >= m.goal ? '<span class="green">✓</span> ' : ""}${esc(m.text)}</span><span class="xpv">+${m.xp} XP</span></div>
+      <progress class="nes-progress ${m.p >= m.goal ? "is-success" : "is-primary"}" value="${Math.min(m.p, m.goal)}" max="${m.goal}"></progress>
+      <div class="muted" style="margin-top:4px">${Math.min(m.p, m.goal)} / ${m.goal}</div></div>`).join("")
+      : `<p class="muted">Quests unlock when the first live buses load.</p>`) + `
       <h3>STOP COLLECTION</h3>
-      <div class="stat"><div><b>${visited}</b><span>of ${STOPS.length} stops</span></div><div><b>${(visited / STOPS.length * 100).toFixed(1)}%</b><span>of Cambridge</span></div><div><b>${Object.values(PLAYER.dex).filter((d) => d.irl).length}</b><span>buses caught IRL</span></div></div>
-      <p class="muted">Turn on <span class="gold">◎ go live (GPS)</span> when you're out. Stops you've checked in at turn gold on the map.</p>`;
+      <div class="stats"><div><b>${visited}</b><span>of ${STOPS.length}</span></div><div><b>${(visited / STOPS.length * 100).toFixed(1)}%</b><span>of the city</span></div><div><b>${Object.values(PLAYER.dex).filter((d) => d.irl).length}</b><span>caught IRL</span></div></div>
+      <p class="muted">Turn on <span class="gold">◎ GPS</span> when you're out. Stops you check in at turn gold.</p>`;
   } else {
     const dex = Object.entries(PLAYER.dex).sort((a, b) => b[1].first - a[1].first);
     const routes = Object.entries(PLAYER.routes).sort((a, b) => b[1] - a[1]);
     P.innerHTML = `
-      <div class="stat"><div><b>${dex.length}</b><span>buses spotted</span></div><div><b>${routes.length}</b><span>routes seen</span></div><div><b>${dex.filter(([, d]) => d.dd).length}</b><span>double-deckers</span></div></div>
-      <h3>ROUTES</h3><div style="display:flex;flex-wrap:wrap;gap:4px">${routes.map(([l, n]) => `<span class="pill" style="background:${routeColour(l)}" title="${n} spots">${esc(l)}</span>`).join("") || `<span class="muted">none yet</span>`}</div>
+      <div class="stats"><div><b>${dex.length}</b><span>buses</span></div><div><b>${routes.length}</b><span>routes</span></div><div><b>${dex.filter(([, d]) => d.dd).length}</b><span>double-deck</span></div></div>
+      <h3>ROUTES SEEN</h3><div class="chips">${routes.map(([l]) => `<span class="chip" style="background:${routeColour(l)};color:${inkFor(routeColour(l))}">${esc(l)}</span>`).join("") || '<span class="muted">none yet</span>'}</div>
       <h3>BUSDEX</h3>
-      <div class="dex">${dex.map(([f, d]) => `<div class="${d.irl ? "irl" : ""}" data-f="${esc(f)}"><b>${esc(d.name)}</b><span>${esc(f.split(" - ")[0])} · ${d.routes.map(esc).join(", ")}${d.irl ? " · ★IRL" : ""}</span></div>`).join("") || `<span class="muted">Click any bus on the map and press "spot it".</span>`}</div>`;
+      <div class="dex">${dex.map(([f, d]) => `<div class="${d.irl ? "irl" : ""}" data-f="${esc(f)}"><b>${esc(d.name)}</b><span>${esc(f.split(" - ")[0])} · ${d.routes.map(esc).join(", ")}${d.irl ? " · ★" : ""}</span></div>`).join("") || '<span class="muted">Tap any bus on the map and press SPOT IT.</span>'}</div>`;
     P.querySelectorAll("[data-f]").forEach((el) => el.onclick = () => {
       const b = [...buses.values()].find((x) => x.fleet === el.dataset.f);
       if (b) { select({ type: "bus", id: b.id }); following = b.id; cam.z = Math.max(cam.z, 2.5); renderCard(); } else toast("That bus isn't out on the road right now");
     });
   }
 }
-
 function focusLine(line) {
-  const list = [...buses.values()].filter((b) => b.line === line);
-  if (!list.length) return;
-  const xs = list.map((b) => b.x), ys = list.map((b) => b.y);
-  cam.x = (Math.min(...xs) + Math.max(...xs)) / 2; cam.y = (Math.min(...ys) + Math.max(...ys)) / 2;
-  const span = Math.max(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys), 150);
-  cam.z = clamp(Math.min(CW, CH) / DPR / (span * 1.4), 0.4, 3);
-  hiddenRoutes.clear(); for (const b of buses.values()) if (b.line !== line) hiddenRoutes.add(b.line);
-  renderLegend(); toast(`Showing route ${line} only. Tap the legend to show all`);
+  sel = { type: "line", id: line }; following = null; renderCard();
+  const R = ROUTES.get(line);
+  let xs = [...buses.values()].filter((b) => b.line === line).map((b) => [b.x, b.y]);
+  if (R) for (const p of R.raw) for (let i = 0; i < p.length; i += 8) xs.push([p[i] / 2, p[i + 1] / 2]);
+  if (!xs.length) return;
+  const X = xs.map((p) => p[0]), Y = xs.map((p) => p[1]);
+  cam.x = (Math.min(...X) + Math.max(...X)) / 2; cam.y = (Math.min(...Y) + Math.max(...Y)) / 2;
+  const span = Math.max(Math.max(...X) - Math.min(...X), (Math.max(...Y) - Math.min(...Y)) * (CW / CH), 150);
+  cam.z = clamp(CW / DPR / (span * 1.15), 0.3, 3); clampCam();
+  toast(`Route ${line}${R?.heads?.length ? ": " + R.heads.slice(0, 2).join(" ⇄ ") : ""}`);
 }
-
 function renderLegend() {
   const rs = liveStats().sort((a, b) => String(a.line).localeCompare(String(b.line), undefined, { numeric: true }));
   const L = $("legend");
-  L.innerHTML = rs.map((r) => `<span class="lg ${hiddenRoutes.has(r.line) ? "off" : ""}" data-l="${esc(r.line)}"><span class="sw" style="background:${routeColour(r.line)}"></span>${esc(r.line)}<span class="ct">${r.n}</span></span>`).join("")
-    + (hiddenRoutes.size ? `<span class="lg" data-all="1" style="color:var(--gold)">show all</span>` : "");
+  L.innerHTML = rs.map((r) => `<span class="chip ${hiddenRoutes.has(r.line) ? "off" : ""}" data-l="${esc(r.line)}" style="background:${routeColour(r.line)};color:${inkFor(routeColour(r.line))}" title="${r.n} live">${esc(r.line)}</span>`).join("")
+    + (hiddenRoutes.size ? `<span class="chip all" data-all="1">show all</span>` : "");
   L.querySelectorAll("[data-l]").forEach((el) => el.onclick = () => {
-    const l = el.dataset.l;
-    if (hiddenRoutes.has(l)) hiddenRoutes.delete(l); else hiddenRoutes.add(l);
-    renderLegend();
+    const l = el.dataset.l; hiddenRoutes.has(l) ? hiddenRoutes.delete(l) : hiddenRoutes.add(l); renderLegend();
   });
   const all = L.querySelector("[data-all]"); if (all) all.onclick = () => { hiddenRoutes.clear(); renderLegend(); };
 }
-
-function onLiveUpdate() {
-  ensureMissions();
-  renderLegend();
-  if (tab === "live") renderPanel();
-  if (sel) renderCard();
-}
-
+function onLiveUpdate() { ensureMissions(); renderLegend(); if (tab === "live") renderPanel(); if (sel) renderCard(); }
 function tickStatus() {
   const age = lastOk ? Math.round((Date.now() - lastOk) / 1000) : null;
   const n = [...buses.values()].filter((b) => !b.gone).length;
@@ -1040,26 +950,42 @@ function tickStatus() {
 }
 
 // ================================================================ BOOT
-$("bHome").onclick = () => { cam.x = 1840; cam.y = 1660; cam.z = 2; following = null; };
-$("bStops").onclick = () => { showStops = !showStops; $("bStops").classList.toggle("on", showStops); };
-$("bTrails").onclick = () => { showTrails = !showTrails; $("bTrails").classList.toggle("on", showTrails); };
+$("bHome").onclick = () => { Object.assign(cam, HOME); following = null; };
+$("bStops").onclick = () => { showStops = !showStops; $("bStops").classList.toggle("is-success", showStops); };
+$("bRoutes").onclick = () => {
+  routesMode = { live: "all", all: "off", off: "live" }[routesMode];
+  $("bRoutes").textContent = `routes: ${routesMode}`; store("theroute_routes", routesMode);
+};
+$("bStyle").onclick = () => {
+  mapStyle = mapStyle === "clear" ? "detail" : "clear";
+  $("bStyle").textContent = `map: ${mapStyle === "clear" ? "clear" : "detailed"}`; store("theroute_style", mapStyle);
+};
 $("bStart").onclick = () => { $("intro").classList.remove("show"); PLAYER.intro = true; save(); };
 
 async function boot() {
   const j = (u) => fetch(u).then((r) => r.json());
-  [META, STOPS, LABELS] = await Promise.all([j("data/meta.json"), j("data/stops.json"), j("data/labels.json")]);
-  overview = new Image(); overview.src = "tiles/overview.png";
+  let rj;
+  [META, STOPS, LABELS, rj] = await Promise.all([j("data/meta.json"), j("data/stops.json"), j("data/labels.json"), j("data/routes.json")]);
+  for (const r of rj.routes) {
+    const path = new Path2D();
+    for (const p of r.paths) { path.moveTo(p[0] / rj.scale, p[1] / rj.scale); for (let i = 2; i < p.length; i += 2) path.lineTo(p[i] / rj.scale, p[i + 1] / rj.scale); }
+    ROUTES.set(r.line, { line: r.line, heads: r.heads, trips: r.trips, path, raw: r.paths });
+  }
+  mapStyle = recall("theroute_style") === "detail" ? "detail" : "clear";
+  routesMode = ["live", "all", "off"].includes(recall("theroute_routes")) ? recall("theroute_routes") : "live";
+  $("bStyle").textContent = `map: ${mapStyle === "clear" ? "clear" : "detailed"}`; $("bRoutes").textContent = `routes: ${routesMode}`;
   resize(); window.addEventListener("resize", resize);
   if (window.innerWidth < 760) cam.z = 1.4;
   renderLevel(); renderPanel();
   if (!PLAYER.intro) $("intro").classList.add("show");
+  document.fonts?.load(`11px ${FONT}`);
   requestAnimationFrame(frame);
-  j("data/graph.json").then((g) => { G = buildGraph(g); });   // roads arrive after first paint
+  j("data/graph.json").then((g) => { G = buildGraph(g); });
   poll(); setInterval(poll, POLL_MS);
   setInterval(() => {
     tickStatus();
-    // hidden/background tabs get no rAF callbacks; paint anyway so the canvas is never stale
-    if (performance.now() - lastFrame > 1000) { const n = performance.now(); stepBuses(n, 16); drawMap(); drawTrails(); drawStops(); drawBuses(n); drawMe(); drawLabels(); lastFrame = n; }
+    // hidden tabs get no rAF; paint anyway so the canvas is never stale
+    if (performance.now() - lastFrame > 1000) { const n = performance.now(); stepBuses(n, 16); render(n); lastFrame = n; }
   }, 1000);
   document.addEventListener("visibilitychange", () => { if (!document.hidden) poll(); });
 }

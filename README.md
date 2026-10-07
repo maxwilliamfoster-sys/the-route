@@ -15,10 +15,26 @@ THE ROUTE is a sister project to THE CUT: same look, but here the city is real a
   - Daily missions, XP and levels.
   - Every bus gets a stable persona (name and trait) generated from its fleet number.
 
+## Design
+- The UI is built with [NES.css](https://github.com/nostalgic-css/NES.css) (MIT): panels, buttons, progress bars, speech balloons and icons.
+- Fonts:
+  - [Departure Mono](https://github.com/rektdeckard/departure-mono) (SIL OFL), self-hosted in `docs/fonts/`, for body text and map labels.
+  - [Press Start 2P](https://fonts.google.com/specimen/Press+Start+2P) (OFL) for headings.
+- Two map styles are baked from the same geometry:
+  - **clear** (default): flat, calm colours with white roads, so buses and route lines read first.
+  - **detailed**: the textured pixel-art city.
+- The simulation layer favours clarity over realism:
+  - Each bus is a bold route badge with a direction pointer.
+  - Routes are transit-map lines taken from the official timetable shapes.
+  - Stops are white dots with a black ring.
+  - Tapping a bus or stop highlights its route(s) and fades everything else.
+
 ## Rebuild the map
 ```
 bash tools/fetch_data.sh   # OSM (Overpass) + NaPTAN into data/raw/
-py tools/bake.py           # -> docs/tiles + docs/data
+curl -L -o data/raw/ea_gtfs.zip https://data.bus-data.dft.gov.uk/timetable/download/gtfs-file/east_anglia/
+py tools/bake.py           # -> docs/tiles/{clear,detail} + docs/data
+py tools/bake_routes.py    # -> docs/data/routes.json + routes-per-stop in stops.json
 ```
 
 ## Run locally

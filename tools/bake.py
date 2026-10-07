@@ -99,7 +99,7 @@ def polygons(el):
 
 # ---- ground classes -------------------------------------------------------
 (FIELD, RES, COMM, IND, GRASS, WOOD, CEMETERY, CAMPUS, PARKING, WATER, PLAZA,
- PAVE, ROAD, BUSWAY, PATH, CYCLE, RAIL, SAND, ALLOT) = range(19)
+ PAVE, ROAD, BUSWAY, PATH, CYCLE, RAIL, SAND, ALLOT, ROAD_MAJOR) = range(20)
 
 BASE = {
     FIELD: (178, 192, 122), RES: (214, 209, 192), COMM: (224, 204, 194),
@@ -108,8 +108,22 @@ BASE = {
     WATER: (66, 142, 206), PLAZA: (228, 220, 202), PAVE: (236, 232, 224),
     ROAD: (98, 100, 112), BUSWAY: (196, 170, 120), PATH: (238, 224, 184),
     CYCLE: (218, 170, 152), RAIL: (132, 122, 112), SAND: (226, 210, 160),
-    ALLOT: (160, 176, 104),
+    ALLOT: (160, 176, 104), ROAD_MAJOR: (98, 100, 112),
 }
+
+# "clear" style: flat, calm colours so live buses and route lines read first.
+# Same geometry as the detailed style: only the paint changes.
+CLEAR = {
+    FIELD: (229, 233, 210), RES: (242, 239, 232), COMM: (245, 236, 232),
+    IND: (236, 234, 240), GRASS: (200, 228, 176), WOOD: (176, 214, 158),
+    CEMETERY: (212, 230, 202), CAMPUS: (247, 238, 214), PARKING: (234, 234, 237),
+    WATER: (152, 202, 242), PLAZA: (250, 247, 240), PAVE: (206, 199, 188),
+    ROAD: (255, 255, 255), BUSWAY: (240, 222, 186), PATH: (224, 214, 192),
+    CYCLE: (230, 206, 196), RAIL: (176, 176, 184), SAND: (240, 230, 198),
+    ALLOT: (218, 230, 186), ROAD_MAJOR: (255, 241, 196),
+}
+CLEAR_EDGE = {WATER: (110, 170, 222), GRASS: (176, 212, 150), WOOD: (150, 196, 132),
+              CAMPUS: (226, 214, 182)}
 
 LANDUSE = {
     "farmland": FIELD, "farmyard": FIELD, "meadow": FIELD, "orchard": FIELD,
@@ -280,20 +294,32 @@ def bake_ground():
         if pw:
             d.line(geom_xy(el["geometry"]), fill=PAVE, width=pw, joint="curve")
     for el in hw:
-        pw, sw, sc = ROAD_STYLE[el["tags"]["highway"]]
+        hwy = el["tags"]["highway"]
+        pw, sw, sc = ROAD_STYLE[hwy]
         if el["tags"].get("area") == "yes":
             continue
+        if sc == ROAD and (hwy in CENTRE_LINE or hwy.endswith("_link")):
+            sc = ROAD_MAJOR
         d.line(geom_xy(el["geometry"]), fill=sc, width=sw, joint="curve")
     return cls, hw, rails
 
 
-def texture(cls):
-    """Class map -> RGB with deterministic pixel-art texture."""
+def texture(cls, style="detail"):
+    """Class map -> RGB. detail = textured pixel art, clear = flat + crisp edges."""
     a = np.asarray(cls)
     hgt, wid = a.shape
+    rgb = np.zeros((hgt, wid, 3), np.uint8)
+    if style == "clear":
+        for c, col in CLEAR.items():
+            rgb[a == c] = col
+        # 1px darker rim where water / parks / woods meet anything else
+        for c, col in CLEAR_EDGE.items():
+            m = a == c
+            edge = m & ~(np.roll(m, 1, 0) & np.roll(m, -1, 0) & np.roll(m, 1, 1) & np.roll(m, -1, 1))
+            rgb[edge] = col
+        return Image.fromarray(rgb, "RGB")
     yy, xx = np.mgrid[0:hgt, 0:wid].astype(np.uint32)
     noise = ((xx * 73856093) ^ (yy * 19349663) ^ ((xx * yy) * 83492791)) % 251
-    rgb = np.zeros((hgt, wid, 3), np.uint8)
     for c, col in BASE.items():
         rgb[a == c] = col
 
@@ -317,7 +343,7 @@ def texture(cls):
     # water: horizontal ripple dashes
     rip = (yy % 4 == 0) & (((xx + (yy // 4) * 5) % 13) < 3)
     shade((a == WATER) & rip, (126, 186, 234))
-    shade((a == ROAD) & (noise < 14), (90, 92, 104))
+    shade(((a == ROAD) | (a == ROAD_MAJOR)) & (noise < 14), (90, 92, 104))
     shade((a == RAIL) & (xx % 3 == 0), (96, 84, 74))
     shade((a == BUSWAY) & (noise < 16), (182, 156, 108))
     return Image.fromarray(rgb, "RGB")
@@ -355,6 +381,7 @@ def darker(c, f=0.72):
 
 
 def building_style(tags, area_px, campus_hit):
+    kind = "plain"
     b = tags.get("building", "yes")
     name = (tags.get("name") or "").lower()
     lv = tags.get("building:levels")
@@ -363,9 +390,9 @@ def building_style(tags, area_px, campus_hit):
     except ValueError:
         levels = None
     if b in ("church", "cathedral", "chapel") or tags.get("amenity") == "place_of_worship":
-        roof, h = (150, 150, 156), 5
+        roof, h, kind = (150, 150, 156), 5, "church"
     elif b in ("college", "university") or campus_hit or "college" in name:
-        roof, h = STONE, 4
+        roof, h, kind = STONE, 4, "college"
     elif b in ("house", "detached", "semidetached_house", "terrace", "residential",
                "bungalow", "apartments", "garage", "garages", "shed", "hut"):
         roof = ROOFS_HOUSE[hashi(tags.get("addr:street", ""), area_px // 40) % len(ROOFS_HOUSE)]
@@ -383,14 +410,19 @@ def building_style(tags, area_px, campus_hit):
     if levels:
         h = levels
     h = int(max(1, min(7, round(h * 0.8)))) if levels else h
-    return roof, h
+    return roof, h, kind
 
 
 def poly_area(r):
     return abs(sum(x0 * y1 - x1 * y0 for (x0, y0), (x1, y1) in zip(r, r[1:] + r[:1]))) / 2
 
 
-def draw_buildings(img, cls):
+CLEAR_BLD = {"plain": ((224, 217, 205), (196, 187, 172)),
+             "college": ((238, 222, 182), (206, 184, 138)),
+             "church": ((214, 210, 220), (178, 172, 188))}
+
+
+def collect_buildings(cls):
     clsa = np.asarray(cls)
     blds = []
     for el in load("buildings.json"):
@@ -407,33 +439,40 @@ def draw_buildings(img, cls):
                 if not (0 <= cx < W and 0 <= cy < H):
                     continue
                 area = poly_area(r)
-                campus = clsa[cy, cx] == CAMPUS
-                roof, h = building_style(t, area, campus)
+                roof, h, kind = building_style(t, area, clsa[cy, cx] == CAMPUS)
                 if t.get("building") == "roof":
                     h = 1
                 if area < 6:
                     h = min(h, 1)
-                blds.append((max(ys), r, roof, h))
+                blds.append((max(ys), r, roof, h, kind, area))
     blds.sort(key=lambda b: b[0])   # north first, so southern walls overlap
     print("buildings:", len(blds))
+    return blds
 
+
+def draw_buildings(img, blds, style="detail"):
+    d = ImageDraw.Draw(img)
+    if style == "clear":
+        # flat footprints with a crisp outline: every building, no fake height
+        for _, r, roof, h, kind, area in blds:
+            fill, line = CLEAR_BLD.get(kind, CLEAR_BLD["plain"])
+            d.polygon(r, fill=fill, outline=line if area > 4 else None)
+        return
     shadow = Image.new("L", (W, H), 0)
     sd = ImageDraw.Draw(shadow)
-    for _, r, roof, h in blds:
+    for _, r, roof, h, kind, area in blds:
         sd.polygon([(x + 1 + h * 0.5, y + 1) for x, y in r], fill=1)
     sh = np.asarray(shadow).astype(bool)
     a = np.asarray(img).copy()
     a[sh] = (a[sh] * 0.78).astype(np.uint8)
     img.paste(Image.fromarray(a, "RGB"))
-
     d = ImageDraw.Draw(img)
-    for _, r, roof, h in blds:
+    for _, r, roof, h, kind, area in blds:
         wall = darker(roof, 0.62)
         for k in range(h):
             d.polygon([(x, y - k) for x, y in r], fill=wall)
         top = [(x, y - h) for x, y in r]
-        d.polygon(top, fill=roof, outline=darker(roof, 0.82) if poly_area(r) > 30 else None)
-    return blds
+        d.polygon(top, fill=roof, outline=darker(roof, 0.82) if area > 30 else None)
 
 
 # ---- data exports ----------------------------------------------------------
@@ -544,22 +583,28 @@ def export_labels():
     return labels
 
 
+STYLES = ("clear", "detail")
+
+
 def main():
-    os.makedirs(os.path.join(DOCS, "tiles"), exist_ok=True)
     os.makedirs(os.path.join(DOCS, "data"), exist_ok=True)
     cls, hw, rails = bake_ground()
-    img = texture(cls)
-    draw_centre_lines(img, hw)
-    draw_buildings(img, cls)
-
+    blds = collect_buildings(cls)
     cols, rows = math.ceil(W / TILE), math.ceil(H / TILE)
-    for c in range(cols):
-        for r in range(rows):
-            tile = img.crop((c * TILE, r * TILE, (c + 1) * TILE, (r + 1) * TILE))
-            tile = tile.quantize(colors=256, method=Image.Quantize.MEDIANCUT, dither=Image.Dither.NONE)
-            tile.save(os.path.join(DOCS, "tiles", f"t_{c}_{r}.png"), optimize=True)
-    ov = img.resize((W // 4, H // 4), Image.Resampling.BOX)
-    ov.save(os.path.join(DOCS, "tiles", "overview.png"), optimize=True)
+    for style in STYLES:
+        out = os.path.join(DOCS, "tiles", style)
+        os.makedirs(out, exist_ok=True)
+        img = texture(cls, style)
+        if style == "detail":
+            draw_centre_lines(img, hw)
+        draw_buildings(img, blds, style)
+        for c in range(cols):
+            for r in range(rows):
+                tile = img.crop((c * TILE, r * TILE, (c + 1) * TILE, (r + 1) * TILE))
+                tile = tile.quantize(colors=256, method=Image.Quantize.MEDIANCUT, dither=Image.Dither.NONE)
+                tile.save(os.path.join(out, f"t_{c}_{r}.png"), optimize=True)
+        img.resize((W // 4, H // 4), Image.Resampling.BOX).save(os.path.join(out, "overview.png"), optimize=True)
+        print("style", style, "done")
 
     roads = [el for el in load("roads.json") if el["type"] == "way" and el.get("geometry")]
     meta = {"W": W, "H": H, "mpp": MPP, "tile": TILE, "cols": cols, "rows": rows,
@@ -574,7 +619,7 @@ def main():
     for name, obj in dumps.items():
         with open(os.path.join(DOCS, "data", name), "w", encoding="utf-8") as f:
             json.dump(obj, f, separators=(",", ":"))
-    print("done:", cols * rows, "tiles")
+    print("done:", cols * rows, "tiles per style")
 
 
 if __name__ == "__main__":
