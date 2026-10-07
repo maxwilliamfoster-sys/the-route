@@ -3,7 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
-<title>THE ROUTE · Cambridge, live</title>
+<title>THE ROUTE · Cambridge live buses</title>
+<meta name="description" content="Every Cambridge bus live on a map, with stop-by-stop arrival times and departure boards.">
 <meta name="theme-color" content="#212529">
 <!-- UI kit: NES.css (MIT, github.com/nostalgic-css/NES.css) · type: Departure Mono (OFL, github.com/rektdeckard/departure-mono) + Press Start 2P (OFL) -->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/nes.css@2.3.0/css/nes.min.css">
@@ -12,25 +13,20 @@
 <style>
   @font-face{font-family:"Departure Mono"; src:url("fonts/DepartureMono-Regular.woff2") format("woff2"); font-display:swap}
   :root{
-    --night:#181a1f; --panel:#212529; --line:#3a3f47; --ink:#f4f4f0; --dim:#9aa1ab;
+    --night:#181a1f; --panel:#212529; --card:#2b3036; --line:#3a3f47; --ink:#f4f4f0; --dim:#9aa1ab;
     --blue:#209cee; --green:#92cc41; --gold:#f7d51d; --red:#e76e55;
     --mono:"Departure Mono", ui-monospace, Menlo, Consolas, monospace;
     --pixel:"Press Start 2P", var(--mono);
   }
   *{box-sizing:border-box}
   html,body{height:100%; margin:0}
-  body{
-    background:var(--night); color:var(--ink); overflow:hidden;
-    font:11px/1.6 var(--mono); display:flex; flex-direction:column;
-    -webkit-font-smoothing:none; font-smooth:never;
-  }
+  body{background:var(--night); color:var(--ink); overflow:hidden; font:11px/1.6 var(--mono); display:flex; flex-direction:column; -webkit-font-smoothing:none}
   button, .nes-btn{font-family:var(--mono)}
+  a{color:var(--blue)}
+  .muted{color:var(--dim)} .gold{color:var(--gold)} .green{color:var(--green)}
 
   /* ---------------------------------------------------------- top bar */
-  .topbar{
-    display:flex; align-items:center; gap:16px; flex-wrap:wrap;
-    padding:10px 16px; background:var(--panel); border-bottom:4px solid #000;
-  }
+  .topbar{display:flex; align-items:center; gap:16px; flex-wrap:wrap; padding:10px 16px; background:var(--panel); border-bottom:4px solid #000}
   .logo{font:14px var(--pixel); letter-spacing:1px; white-space:nowrap}
   .logo b{color:var(--gold); font-weight:400}
   .tag{color:var(--dim); letter-spacing:2px}
@@ -38,10 +34,11 @@
   #dot{width:8px; height:8px; background:var(--green); box-shadow:0 0 0 2px #000; animation:blink 1.6s steps(2) infinite}
   #dot.stale{background:var(--red); animation:none}
   @keyframes blink{50%{opacity:.25}}
-  .xp{display:flex; align-items:center; gap:10px; margin-left:auto; min-width:200px}
-  .xp .lv{font:10px var(--pixel); color:var(--gold); white-space:nowrap}
-  .xp .nes-progress{height:18px; margin:0; flex:1; min-width:90px}
-  .xp #lvT{color:var(--dim); white-space:nowrap}
+  .topbar .right{margin-left:auto; display:flex; gap:12px; align-items:center}
+  #acc{padding:0 6px; box-shadow:0 0 0 2px #000; cursor:help; white-space:nowrap}
+  #acc.exact{background:var(--green); color:#000}
+  #acc.est{background:var(--card); color:var(--dim)}
+  #clock{font:10px var(--pixel); color:var(--ink)}
 
   main{flex:1; display:flex; min-height:0}
   #stage{flex:1; position:relative; min-width:0; overflow:hidden; background:#e9e6dc}
@@ -52,97 +49,37 @@
   .hud-r{position:absolute; right:12px; top:12px; z-index:4; display:flex; flex-direction:column; gap:10px; align-items:flex-end}
   .hud-r .nes-btn{font-size:11px; padding:2px 8px; margin:0}
   .chips{display:flex; flex-wrap:wrap; gap:6px}
-  .chip{
-    font:11px var(--mono); padding:1px 6px; color:#000; cursor:pointer; user-select:none;
-    box-shadow:0 0 0 2px #000; border:0; line-height:16px;
-  }
+  .chip{font:11px var(--mono); padding:1px 6px; color:#000; cursor:pointer; user-select:none; box-shadow:0 0 0 2px #000; border:0; line-height:16px}
   .chip.off{opacity:.3}
   .chip.all{background:var(--panel); color:var(--gold)}
-  .hint{
-    position:absolute; left:12px; bottom:12px; z-index:4; background:var(--panel); color:var(--dim);
-    padding:3px 8px; box-shadow:0 0 0 2px #000; pointer-events:none;
-  }
+  .hint{position:absolute; left:12px; bottom:12px; z-index:4; background:var(--panel); color:var(--dim); padding:3px 8px; box-shadow:0 0 0 2px #000; pointer-events:none}
   .hint b{color:var(--gold); font-weight:400}
-  #toast{
-    position:absolute; left:50%; top:16px; transform:translate(-50%,-12px); z-index:9; opacity:0;
-    transition:opacity .2s, transform .2s; pointer-events:none; white-space:nowrap;
-    background:#fff; color:#212529; padding:8px 14px 8px 10px; display:flex; align-items:center; gap:10px;
-    box-shadow:0 0 0 4px #000;
-  }
+  #toast{position:absolute; left:50%; top:16px; transform:translate(-50%,-12px); z-index:9; opacity:0; transition:opacity .2s, transform .2s; pointer-events:none;
+    background:#fff; color:#212529; padding:8px 14px; box-shadow:0 0 0 4px #000; max-width:90%; text-align:center}
   #toast.show{opacity:1; transform:translate(-50%,0)}
+  #bRecenter{position:absolute; left:50%; bottom:16px; transform:translateX(-50%); z-index:5; font-size:11px; padding:2px 10px; margin:0}
 
   /* ---------------------------------------------------------- sidebar */
-  aside{width:360px; background:var(--panel); border-left:4px solid #000; display:flex; flex-direction:column; min-height:0}
-  .pad{padding:14px 14px 0}
-  .nes-container.is-dark{background:var(--panel); padding:14px 14px 12px; margin:6px 0 16px}
-  .nes-container.with-title>.title{font:10px var(--pixel); background:var(--panel); padding:0 8px; margin-top:-21px; margin-bottom:10px}
-  #card{display:none}
-  #card.show{display:block}
-  .head{display:flex; align-items:center; gap:10px}
-  .head h2{font:400 11px var(--mono); margin:0; flex:1; min-width:0}
-  .head .x{cursor:pointer; color:var(--dim)}
-  .rt{
-    display:inline-block; font:11px var(--mono); padding:0 6px; color:#000; line-height:16px;
-    box-shadow:0 0 0 2px #000; min-width:22px; text-align:center;
-  }
-  .rt.big{font:12px var(--pixel); padding:5px 7px; line-height:12px}
-  .who{color:var(--gold); margin-top:10px}
-  .nes-balloon.is-dark{font-size:11px; padding:8px 12px; margin:8px 0 30px 10px; background:var(--panel)}
-  .kv{display:grid; grid-template-columns:auto 1fr; gap:2px 14px}
-  .kv span:nth-child(odd){color:var(--dim)}
-  .acts{display:flex; gap:10px; margin-top:14px; flex-wrap:wrap}
-  .acts .nes-btn{font-size:11px; padding:2px 8px; margin:0}
-  ul.list{list-style:none; padding:0; margin:6px 0 0}
-  ul.list li{display:flex; gap:8px; align-items:center; padding:4px 0; border-bottom:2px dotted var(--line); cursor:pointer}
-  ul.list li:hover{color:var(--gold)}
-  ul.list li .r{margin-left:auto; color:var(--dim)}
-  .tabs{display:flex; gap:8px; padding:12px 14px 4px}
-  .tabs .nes-btn{flex:1; font:9px var(--pixel); padding:6px 0; margin:0}
-  #panel{flex:1; overflow-y:auto; padding:10px 14px 18px}
-  .stats{display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin:4px 0 14px}
-  .stats div{background:#2b3036; box-shadow:0 0 0 2px #000; padding:7px 8px}
-  .stats b{display:block; font:16px var(--pixel); margin-bottom:6px}
-  .stats span{color:var(--dim)}
-  h3{font:9px var(--pixel); color:var(--dim); margin:16px 0 8px; letter-spacing:1px}
-  .row{display:flex; align-items:center; gap:8px; padding:4px 0; border-bottom:2px dotted var(--line)}
-  .row .n{color:var(--dim); width:16px; text-align:right}
-  .row .g{flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
-  .row .v{color:var(--ink)}
-  .row.click{cursor:pointer}
-  .row.click:hover .g{color:var(--gold)}
-  .bar{height:6px; background:#000; flex:0 0 60px; position:relative}
-  .bar i{position:absolute; inset:0 auto 0 0; background:var(--green)}
-  .mission{background:#2b3036; box-shadow:0 0 0 2px #000; padding:10px; margin:0 2px 14px}
-  .mission .t{display:flex; justify-content:space-between; gap:8px; margin-bottom:6px}
-  .mission .t .xpv{color:var(--gold); white-space:nowrap}
-  .mission .nes-progress{height:14px; margin:0; width:100%}
-  .mission.done{box-shadow:0 0 0 2px var(--green)}
-  .dex{display:grid; grid-template-columns:repeat(auto-fill,minmax(96px,1fr)); gap:10px; padding:2px}
-  .dex div{background:#2b3036; box-shadow:0 0 0 2px #000; padding:6px 7px; cursor:pointer}
-  .dex div.irl{box-shadow:0 0 0 2px var(--gold)}
-  .dex div b{display:block; font-weight:400}
-  .dex div span{color:var(--dim)}
-  .muted{color:var(--dim)} .gold{color:var(--gold)} .green{color:var(--green)}
-  a{color:var(--blue)}
-  #intro{position:absolute; inset:0; z-index:10; background:rgba(24,26,31,.88); display:none; align-items:center; justify-content:center; padding:16px}
-  #intro.show{display:flex}
-  #intro .nes-container{max-width:470px; margin:0}
-  #intro p{margin:0 0 10px}
-  #intro b{color:var(--gold); font-weight:400}
-
-  /* ---------------------------------------------------------- search + tracking */
+  aside{width:370px; background:var(--panel); border-left:4px solid #000; display:flex; flex-direction:column; min-height:0}
   .search{position:relative; padding:12px 14px 0}
-  .search input{width:100%; font:11px var(--mono); padding:7px 9px; background:#2b3036; color:var(--ink); border:0; outline:0;
-    box-shadow:0 0 0 2px #000, inset 0 0 0 2px #3a3f47; -webkit-appearance:none; border-radius:0}
+  .search input{width:100%; font:11px var(--mono); padding:7px 9px; background:var(--card); color:var(--ink); border:0; outline:0;
+    box-shadow:0 0 0 2px #000, inset 0 0 0 2px var(--line); -webkit-appearance:none; border-radius:0}
   .search input:focus{box-shadow:0 0 0 2px var(--gold)}
   #results{position:absolute; left:14px; right:14px; top:46px; z-index:20; background:var(--panel); box-shadow:0 0 0 2px #000, 0 6px 0 rgba(0,0,0,.35); max-height:330px; overflow:auto}
   #results div{display:flex; gap:8px; align-items:center; padding:7px 9px; border-bottom:2px dotted var(--line); cursor:pointer}
-  #results div:hover{background:#2b3036}
-  #results .sd{width:10px; height:10px; border-radius:50%; background:#fff; box-shadow:0 0 0 2px #000; flex:0 0 10px}
-  .pad{max-height:66vh; overflow-y:auto; padding-top:18px}
+  #results div:hover{background:var(--card)}
+  .sd{width:10px; height:10px; border-radius:50%; background:#fff; box-shadow:0 0 0 2px #000; flex:0 0 10px; display:inline-block}
+  .pad{padding:18px 14px 0; max-height:68vh; overflow-y:auto}
   aside:not(.has-card) .pad{display:none}
+  .nes-container.is-dark{background:var(--panel); padding:14px 14px 12px; margin:6px 0 16px}
+  .nes-container.with-title>.title{font:10px var(--pixel); background:var(--panel); padding:0 8px; margin-top:-21px; margin-bottom:10px}
+  .head{display:flex; align-items:center; gap:10px}
+  .head h2{font:400 11px var(--mono); margin:0; flex:1; min-width:0}
+  .head .x{cursor:pointer; color:var(--dim); font-size:13px; padding:0 2px}
+  .rt{display:inline-block; font:11px var(--mono); padding:0 6px; color:#000; line-height:16px; box-shadow:0 0 0 2px #000; min-width:22px; text-align:center}
+  .rt.big{font:12px var(--pixel); padding:5px 7px; line-height:12px}
   .status{display:flex; flex-wrap:wrap; gap:8px; margin:10px 0 8px}
-  .tagx{padding:0 6px; box-shadow:0 0 0 2px #000; background:#2b3036}
+  .tagx{padding:0 6px; box-shadow:0 0 0 2px #000; background:var(--card)}
   .tagx.green{background:var(--green); color:#000} .tagx.late{background:var(--red); color:#000} .tagx.early{background:var(--blue); color:#000}
   .where{margin:4px 0 12px}
   .where b{font-weight:400; color:var(--gold)}
@@ -150,6 +87,7 @@
   .journey .track{position:relative; height:8px; background:#000; margin:6px 0}
   .journey .track i{position:absolute; inset:0 auto 0 0; background:var(--gold)}
   .journey .track b{position:absolute; top:-4px; width:6px; height:16px; margin-left:-3px; background:#fff; box-shadow:0 0 0 2px #000}
+  h3{font:9px var(--pixel); color:var(--dim); margin:16px 0 8px; letter-spacing:1px}
   ul.eta{list-style:none; padding:0; margin:4px 0 0}
   ul.eta li{display:flex; align-items:center; gap:8px; padding:5px 0; border-bottom:2px dotted var(--line); cursor:pointer}
   ul.eta li:hover .nm{color:var(--gold)}
@@ -158,6 +96,7 @@
   ul.eta li.next .nm, ul.eta li.next .in{color:var(--gold)}
   ul.eta li.ext .nm{color:var(--dim)}
   ul.eta .nm{flex:1; min-width:0}
+  ul.eta .nm small{display:block; color:var(--dim); font-size:10px}
   ul.eta .in{min-width:46px; text-align:right; white-space:nowrap}
   ul.eta .at{color:var(--dim); min-width:38px; text-align:right}
   .bell{background:none; border:0; cursor:pointer; padding:0 2px; font-size:12px; opacity:.4; filter:grayscale(1)}
@@ -165,21 +104,34 @@
   .src{font-size:10px; padding:0 4px; color:var(--dim); box-shadow:0 0 0 1px var(--line); white-space:nowrap}
   .src.live, .src.green{color:#000; background:var(--green); box-shadow:none}
   .src.late{color:#000; background:var(--red); box-shadow:none} .src.early{color:#000; background:var(--blue); box-shadow:none}
+  .kv{display:grid; grid-template-columns:auto 1fr; gap:2px 14px; margin-top:12px}
+  .kv span:nth-child(odd){color:var(--dim)}
+  .acts{display:flex; gap:10px; margin-top:14px; flex-wrap:wrap}
+  .acts .nes-btn{font-size:11px; padding:2px 8px; margin:0}
   .nes-btn.more{font-size:10px; padding:0 8px; margin:10px 0 0}
-  details.about{margin-top:14px} details.about summary{cursor:pointer; color:var(--dim)}
-  #bRecenter{position:absolute; left:50%; bottom:16px; transform:translateX(-50%); z-index:5; font-size:11px; padding:2px 10px; margin:0}
+  .note{color:var(--dim); margin:10px 0 0; font-size:10px}
+  .tabs{display:flex; gap:8px; padding:12px 14px 4px}
+  .tabs .nes-btn{flex:1; font:9px var(--pixel); padding:6px 0; margin:0}
+  #panel{flex:1; overflow-y:auto; padding:10px 14px 18px}
+  .stopbox{background:var(--card); box-shadow:0 0 0 2px #000; padding:8px 9px; margin:2px 2px 12px; cursor:pointer}
+  .stopbox:hover .nm{color:var(--gold)}
+  .stopbox .top{display:flex; gap:8px; align-items:baseline}
+  .stopbox .nm{flex:1}
+  .stopbox .deps{display:flex; flex-wrap:wrap; gap:6px 10px; margin-top:6px}
+  .stopbox .deps span{white-space:nowrap}
+  .row{display:flex; align-items:center; gap:8px; padding:5px 0; border-bottom:2px dotted var(--line); cursor:pointer}
+  .row:hover .g{color:var(--gold)}
+  .row .g{flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
 
   @media (max-width:760px){
     main{flex-direction:column}
-    aside{width:auto; height:44%; border-left:0; border-top:4px solid #000}
-    .tag,.hint{display:none}
-    .topbar{gap:10px; padding:8px 12px}
-    .xp{min-width:0; flex-basis:100%; margin-left:0}
-    .hud-l{max-width:56%}
-    aside{height:40%}
-    aside.has-card{height:52%}
+    aside{width:auto; height:42%; border-left:0; border-top:4px solid #000}
+    aside.has-card{height:55%}
     aside.has-card .tabs, aside.has-card #panel{display:none}
     aside.has-card .pad{max-height:none; flex:1}
+    .tag,.hint{display:none}
+    .topbar{gap:10px; padding:8px 12px}
+    .hud-l{max-width:56%}
     .hud-r{gap:8px}
     .hud-r .nes-btn{font-size:10px; padding:0 6px}
     .chip{font-size:10px; padding:0 4px}
@@ -191,8 +143,7 @@
   <div class="logo">THE <b>ROUTE</b></div>
   <span class="tag">CAMBRIDGE · LIVE BUSES</span>
   <div class="live"><i id="dot"></i><span id="status">connecting…</span></div>
-  <div class="xp"><span class="lv">LV <span id="lvN">1</span></span>
-    <progress class="nes-progress is-warning" id="lvBar" value="0" max="100"></progress><span id="lvT">Rookie Spotter</span></div>
+  <div class="right"><span id="acc" class="est" title="">ESTIMATED</span><span id="clock">--:--</span></div>
 </header>
 <main>
   <div id="stage">
@@ -200,29 +151,22 @@
     <div class="hud-l"><div class="chips" id="legend"></div></div>
     <div class="hud-r">
       <button class="nes-btn" id="bHome" title="Back to the city centre">⌂ centre</button>
-      <button class="nes-btn" id="bGps" title="Use your real location to check in at stops and catch buses">◎ GPS</button>
+      <button class="nes-btn" id="bGps" title="Show stops and departures near you">◎ near me</button>
       <button class="nes-btn" id="bRoutes" title="Route lines: live / all / off">routes: live</button>
       <button class="nes-btn" id="bStyle" title="Map style">map: clear</button>
       <button class="nes-btn is-success" id="bStops" title="Show bus stops">stops</button>
     </div>
-    <div class="hint"><b>drag</b> pan · <b>scroll</b> zoom · <b>tap</b> a bus or stop</div>
+    <div class="hint"><b>tap</b> a bus to track it · <b>tap</b> a stop for departures · <b>drag</b>/<b>scroll</b> to move</div>
     <button class="nes-btn is-primary" id="bRecenter" hidden>◎ back to the bus</button>
-    <div id="toast"><i class="nes-icon coin is-small"></i><span id="toastT"></span></div>
-    <div id="intro"><div class="nes-container is-dark with-title">
-      <p class="title">THE ROUTE</p>
-      <p>This is <b>real Cambridge</b>, drawn from OpenStreetMap. Every badge on it is a <b>real bus, right now</b>, on its real route. All 700+ stops are on the map too.</p>
-      <p><b>Spot</b> buses to fill your Busdex. Out in town? Turn on <b>GPS</b> and stand near a real bus to <b>catch</b> it, or near a stop to <b>check in</b>. That's worth far more XP.</p>
-      <p class="muted">There are three missions a day, and they reset at midnight.</p>
-      <button class="nes-btn is-primary" id="bStart">START SPOTTING</button>
-    </div></div>
+    <div id="toast"></div>
   </div>
   <aside>
-    <div class="search"><input id="q" type="search" placeholder="search a stop or route…  e.g. Addenbrooke's, PR3" autocomplete="off" enterkeyhint="search"><div id="results" hidden></div></div>
+    <div class="search"><input id="q" type="search" placeholder="search a stop, area or route…  e.g. Addenbrooke's, PR3" autocomplete="off" enterkeyhint="search"><div id="results" hidden></div></div>
     <div class="pad"><section class="nes-container is-dark with-title" id="card"></section></div>
     <div class="tabs">
-      <button class="nes-btn is-warning" data-tab="live">LIVE</button>
-      <button class="nes-btn" data-tab="missions">QUESTS</button>
-      <button class="nes-btn" data-tab="dex">BUSDEX</button>
+      <button class="nes-btn is-warning" data-tab="nearby">NEARBY</button>
+      <button class="nes-btn" data-tab="routes">ROUTES</button>
+      <button class="nes-btn" data-tab="saved">SAVED</button>
     </div>
     <div id="panel"></div>
   </aside>
@@ -230,15 +174,21 @@
 <script>
 "use strict";
 // ======================================================================
-//  THE ROUTE — live Cambridge buses on a real map, made clear and playable.
-//  Baked by tools/bake.py (tiles, stops, roads) + tools/bake_routes.py
-//  (route lines + routes-per-stop, from the official BODS GTFS).
-//  Live positions: bustimes.org (Bus Open Data Service, OGL).
+//  THE ROUTE — every Cambridge bus, live: where it is, where it's going,
+//  and when it will get to your stop.
+//
+//  Static data (baked): map tiles, stops, road graph (tools/bake.py), route
+//  lines (tools/bake_routes.py), journey patterns + run times + calendars
+//  (tools/bake_patterns.py), all from OpenStreetMap / NaPTAN / BODS GTFS.
+//  Live data: bustimes.org positions (BODS, OGL), plus — when the relay in
+//  worker/ is deployed — the official BODS GTFS-RT feed, which names the exact
+//  timetabled trip each bus is running. With it, early/late and ETAs are
+//  computed against that trip's own timetable; without it, the trip is inferred.
 // ======================================================================
-const LIVE_URL = (m) =>
+const BUSTIMES_URL = (m) =>
   `https://bustimes.org/vehicles.json?ymax=${m.lat1}&xmax=${m.lon1}&ymin=${m.lat0}&xmin=${m.lon0}`;
+const RELAY_DEFAULT = "";            // e.g. "https://the-route-live.<you>.workers.dev" once deployed
 const POLL_MS = 12000;
-const CATCH_M = 80, CHECKIN_M = 45;
 const HOME = { x: 1880, y: 1680, z: 2 };
 const FONT = '"Departure Mono", ui-monospace, Menlo, monospace';
 
@@ -255,19 +205,30 @@ const hiddenRoutes = new Set();
 const $ = (id) => document.getElementById(id);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 function hash(s) { let h = 2166136261; for (const ch of String(s)) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619); } return h >>> 0; }
+const hash8 = (s) => hash(s).toString(16).padStart(8, "0");     // same as fnv() in tools/bake_patterns.py
 function proj(lat, lon) { return [(lon - META.lon0) * META.mPerDegLon / META.mpp, (META.lat1 - lat) * META.mPerDegLat / META.mpp]; }
 function unproj(x, y) { return [META.lat1 - y * META.mpp / META.mPerDegLat, META.lon0 + x * META.mpp / META.mPerDegLon]; }
 const toScreen = (x, y) => [(x - cam.x) * cam.z * DPR + CW / 2, (y - cam.y) * cam.z * DPR + CH / 2];
 const toMap = (sx, sy) => [(sx - CW / 2) / (cam.z * DPR) + cam.x, (sy - CH / 2) / (cam.z * DPR) + cam.y];
 const metres = (px) => px * META.mpp;
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-function toast(msg) { $("toastT").textContent = msg; const t = $("toast"); t.classList.add("show"); clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove("show"), 2600); }
-function today() { return new Date().toLocaleDateString("en-CA", { timeZone: "Europe/London" }); }
+function toast(msg) { const t = $("toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove("show"), 3000); }
 function store(k, v) { try { localStorage.setItem(k, v); } catch {} }
 function recall(k) { try { return localStorage.getItem(k); } catch { return null; } }
+const distTxt = (m) => m < 1000 ? `${Math.round(m / 10) * 10} m` : `${(m / 1000).toFixed(1)} km`;
+
+// relay URL: ?relay=https://... once (remembered), or RELAY_DEFAULT
+let RELAY = (() => {
+  const q = new URLSearchParams(location.search).get("relay");
+  if (q !== null) { store("theroute_relay", q); return q; }
+  return recall("theroute_relay") || RELAY_DEFAULT;
+})();
+
+// saved stops
+const SAVED = new Set((() => { try { return JSON.parse(recall("theroute_saved") || "[]"); } catch { return []; } })());
+const saveSaved = () => store("theroute_saved", JSON.stringify([...SAVED]));
 
 // ---------------------------------------------------------- route colours
-// One bold, distinct colour per line, tuned to read on the pale map.
 const ROUTE_COL = {
   "1": "#e4422f", "2": "#1f8fe0", "3": "#3aa655", "4": "#e9b11a", "5": "#9b59d0", "6": "#f07d1e",
   "7": "#14b3a3", "8": "#e0458b", "8A": "#c2387a", "13": "#a8743e", "13A": "#8c6034", "18": "#4d8f8f",
@@ -283,22 +244,7 @@ function inkFor(hex) {
   return (0.299 * r + 0.587 * g + 0.114 * b) > 150 ? "#000" : "#fff";
 }
 const pill = (line, big) => `<span class="rt${big ? " big" : ""}" style="background:${routeColour(line)};color:${inkFor(routeColour(line))}">${esc(line)}</span>`;
-
-// ---------------------------------------------------------- personalities
-const FIRST = ["Doris","Barry","Gwen","Keith","Maureen","Trevor","Pam","Nigel","Sheila","Clive","Brenda","Derek","Jean","Colin","Val","Roy","Margaret","Kevin","Irene","Graham","Linda","Stan","Joyce","Dennis","Hilda","Malcolm","Carol","Terry","Edna","Geoff","Wendy","Alan","Rita","Norman","Sandra","Phil","Beryl","Ron","Glenys","Dave"];
-const EPI = ["the Unstoppable","of Milton","the Punctual","the Wanderer","the Big","the Old","the Swift","the Slightly Late","of the Busway","the Brave","the Patient","the Diesel Dreamer","the Night Owl","the Gentle Giant","of Trumpington","the Shortcut King","the Reliable","the Mysterious","of Cherry Hinton","the Philosopher"];
-const TRAIT = [
-  "Takes every speed bump personally.", "Has opinions about the Mill Road bridge.", "Always early, never forgiven for it.",
-  "Dreams of the open busway.", "Knows every pothole by name.", "Secretly hates roundabouts.",
-  "Once made it to Addenbrooke's in 9 minutes. Won't shut up about it.", "Waits for runners. Every time.",
-  "Thinks the guided busway is a rollercoaster.", "Collects lost umbrellas.", "Has never once been on time and is at peace with it.",
-  "Sings (badly) when the engine idles.", "Gets nervous near punts.", "Rivalry with every bus on the next route.",
-  "Prefers the night shift. Fewer students.", "Counts the cyclists. Loses count.", "Very proud of its new seats.",
-  "Was nearly scrapped in 2019. Remembers.", "Considers King's Parade its runway.", "Has a favourite stop and won't say which."];
-function persona(fleet) {
-  const h = hash(fleet);
-  return { name: `${FIRST[h % FIRST.length]} ${EPI[(h >>> 8) % EPI.length]}`, trait: TRAIT[(h >>> 16) % TRAIT.length] };
-}
+const chip = (l) => `<span class="chip" data-line="${esc(l)}" style="background:${routeColour(l)};color:${inkFor(routeColour(l))}">${esc(l)}</span>`;
 
 // ================================================================ ROAD GRAPH
 // Moves between reported positions follow the real road network (A*).
@@ -399,21 +345,25 @@ function along(path, d) {
 // ================================================================ LIVE BUSES
 const buses = new Map();
 let lastPoll = 0, lastOk = 0, polling = false;
+const vkey = (s) => String(s || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
 function busFrom(v) {
-  const fleet = v.vehicle?.name || `#${v.id}`;
+  const name = v.vehicle?.name || `#${v.id}`;
+  const [fleet, reg] = name.split(" - ");
   return {
-    id: v.id, line: v.service?.line_name || "?", fleet, dest: v.destination || "",
-    dd: /double/i.test(v.vehicle?.features || ""), features: v.vehicle?.features || "",
-    url: v.vehicle?.url || "", persona: persona(fleet),
-    x: 0, y: 0, ang: 0, path: null, t0: 0, dur: 1, lastSeen: 0, kmh: null, feedTime: 0, fx: 0, fy: 0, fade: 1,
+    id: v.id, line: v.service?.line_name || "?", name, fleet: fleet || name, reg: reg || "",
+    keys: [vkey(fleet), vkey(reg), vkey(name)].filter(Boolean),
+    dest: v.destination || "", dd: /double/i.test(v.vehicle?.features || ""), features: v.vehicle?.features || "",
+    url: v.vehicle?.url || "", btTrip: v.trip_id ?? null,
+    x: 0, y: 0, ang: 0, angKnown: false, path: null, t0: 0, dur: 1, lastSeen: 0, kmh: null,
+    feedTime: 0, fx: 0, fy: 0, fade: 1, m: null,
   };
 }
 async function poll() {
-  // background tabs still poll, rarely (and always once, so the first paint is never empty)
   if (polling || (document.hidden && lastOk && Date.now() - lastPoll < 60000)) return;
   polling = true;
   try {
-    const r = await fetch(LIVE_URL(META), { cache: "no-store" });
+    await pollRelay();
+    const r = await fetch(BUSTIMES_URL(META), { cache: "no-store" });
     if (!r.ok) throw new Error(r.status);
     const list = await r.json();
     const now = performance.now(), seen = new Set();
@@ -421,19 +371,19 @@ async function poll() {
       if (!v.coordinates) continue;
       const [x, y] = proj(v.coordinates[1], v.coordinates[0]);
       if (x < -50 || y < -50 || x > META.W + 50 || y > META.H + 50) continue;
+      const ft = Date.parse(v.datetime) || Date.now();
+      if (Date.now() - ft > 15 * 60000) continue;                      // a report this old is not "live"
       seen.add(v.id);
       let b = buses.get(v.id);
-      const ft = Date.parse(v.datetime) || Date.now();
       if (!b) {
         b = busFrom(v); buses.set(v.id, b);
         b.x = b.fx = x; b.y = b.fy = y; b.feedTime = ft; b.fade = 0;
         b.ang = ((v.heading ?? 0) - 90) * Math.PI / 180; b.angKnown = v.heading != null;
       } else {
-        b.line = v.service?.line_name || b.line; b.dest = v.destination || b.dest; b.gone = false;
+        b.line = v.service?.line_name || b.line; b.dest = v.destination || b.dest; b.gone = false; b.btTrip = v.trip_id ?? b.btTrip;
         if (ft > b.feedTime && (Math.abs(x - b.fx) > 0.3 || Math.abs(y - b.fy) > 0.3)) {
           const dtS = (ft - b.feedTime) / 1000, p = roadPath(b.x, b.y, x, y);
           if (dtS > 4) {
-            // road distance, never trusting a detour beyond 1.6x the straight line
             const d = Math.min(p.len, Math.hypot(x - b.fx, y - b.fy) * 1.6 + 5), v_ = metres(d) / dtS * 3.6;
             if (v_ < 105) b.kmh = b.kmh == null ? v_ : b.kmh * 0.5 + v_ * 0.5;
           }
@@ -464,28 +414,48 @@ function stepBuses(now, dt) {
   }
 }
 
+// ---- optional relay: official GTFS-RT with exact trip ids (worker/src/index.js)
+let RT = new Map(), rtOk = 0, rtErr = null;
+async function pollRelay() {
+  if (!RELAY) return;
+  try {
+    const r = await fetch(RELAY.replace(/\/+$/, "") + "/live", { cache: "no-store" });
+    const j = await r.json();
+    if (!j.v) throw new Error(j.error || "bad relay reply");
+    const m = new Map();
+    for (const o of j.v) if (o.trip && o.id && (!o.ts || j.ts - o.ts < 900)) m.set(vkey(o.id), o);
+    RT = m; rtOk = Date.now(); rtErr = null;
+  } catch (e) { rtErr = String(e.message || e); console.warn("relay failed", e); }
+}
+const relayLive = () => RELAY && Date.now() - rtOk < 90000;
+
 // ================================================================ ETA ENGINE
-// Live buses are matched to a timetabled journey pattern (official BODS GTFS):
-// project the bus onto each candidate route shape, read the scheduled running
-// time at that point, and pick the timetabled trip it is closest to. That gives
-// upcoming stops with ETAs, early/late, and departure boards for stops.
+// Each live bus is tied to one timetabled trip of one journey pattern:
+//   exact   — the relay names the trip (GTFS-RT trip_id → our trip hash)
+//   matched — inferred from position, heading, destination and the clock
+// Its position along the route, read against THAT trip's own scheduled times,
+// gives how early/late it is; remaining run times give ETAs at each stop.
 let PATTERNS = [], PAT_BY_LINE = new Map(), CAL = {}, EXT = {};
-const STOP_BY_ID = new Map();
+const STOP_BY_ID = new Map(), STOP_PATS = new Map(), TRIP_BY_HASH = new Map();
 function loadPatterns(pj) {
-  for (const p of pj.patterns) {
+  pj.patterns.forEach((p, idx) => {
     const n = p.shape.length / 2, X = new Float32Array(n), Y = new Float32Array(n), C = new Float32Array(n);
     for (let i = 0; i < n; i++) {
       X[i] = p.shape[2 * i] / pj.scale; Y[i] = p.shape[2 * i + 1] / pj.scale;
       if (i) C[i] = C[i - 1] + Math.hypot(X[i] - X[i - 1], Y[i] - Y[i - 1]);
     }
-    const P = { line: p.line, head: p.head, stops: p.stops, d: p.d, offs: p.offs, trips: p.trips, X, Y, C, set: new Set(p.stops) };
+    const P = { key: idx, line: p.line, head: p.head, stops: p.stops, d: p.d, offs: p.offs, tp: p.tp,
+                profiles: p.profiles, trips: p.trips, X, Y, C, set: new Set(p.stops) };
     PATTERNS.push(P);
     if (!PAT_BY_LINE.has(p.line)) PAT_BY_LINE.set(p.line, []);
     PAT_BY_LINE.get(p.line).push(P);
-  }
+    p.stops.forEach((sid, k) => { if (!STOP_PATS.has(sid)) STOP_PATS.set(sid, []); STOP_PATS.get(sid).push([P, k]); });
+    for (const tr of p.trips) TRIP_BY_HASH.set(tr[3], [P, tr]);
+  });
   CAL = pj.calendar; EXT = pj.ext;
   for (const b of buses.values()) matchBus(b);
   if (sel) renderCard();
+  renderPanel();
 }
 function stopInfo(id) {
   const s = STOP_BY_ID.get(id); if (s) return s;
@@ -493,7 +463,7 @@ function stopInfo(id) {
 }
 const stopLabel = (s) => s.name + (s.ind && s.ind.length < 10 ? ` (${s.ind})` : "");
 
-// ---- clock & calendar (Europe/London; GTFS times run past 24:00)
+// ---- London clock & service calendars (GTFS times run past 24:00)
 const DTF = new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/London", year: "numeric", month: "2-digit", day: "2-digit",
   hour: "2-digit", minute: "2-digit", second: "2-digit", weekday: "short", hour12: false });
 function london(ms = Date.now()) {
@@ -501,6 +471,10 @@ function london(ms = Date.now()) {
   return { ymd: o.year + o.month + o.day, sec: (+o.hour % 24) * 3600 + (+o.minute) * 60 + (+o.second),
            wd: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].indexOf(o.weekday) };
 }
+const dayStartOf = (ms) => ms - (ms % 1000) - london(ms).sec * 1000;     // epoch ms of that London midnight
+const HM = new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/London", hour: "2-digit", minute: "2-digit", hour12: false });
+const hm = (ms) => HM.format(new Date(ms));
+const mins = (s) => s < 45 ? "due" : s < 3600 ? `${Math.round(s / 60)} min` : `${Math.floor(s / 3600)}h ${Math.round((s % 3600) / 60)}m`;
 const svcCache = new Map();
 function serviceOn(sid, day) {
   const k = sid + "@" + day.ymd;
@@ -510,18 +484,16 @@ function serviceOn(sid, day) {
     : c.days[day.wd] === "1" && c.from <= day.ymd && day.ymd <= c.to;
   svcCache.set(k, on); return on;
 }
-const clock = (secOfDay) => { const s = ((Math.round(secOfDay) % 86400) + 86400) % 86400; return `${String(Math.floor(s / 3600)).padStart(2, "0")}:${String(Math.floor(s / 60) % 60).padStart(2, "0")}`; };
-const mins = (s) => s < 45 ? "due" : `${Math.round(s / 60)} min`;
 
 // ---- geometry
-function projectOn(P, x, y, ang, prevAlong) {
+function projectOn(P, x, y, ang, prevAlong, maxD = 30) {
   let best = null;
   for (let i = 0; i < P.X.length - 1; i++) {
     const x0 = P.X[i], y0 = P.Y[i], vx = P.X[i + 1] - x0, vy = P.Y[i + 1] - y0, L2 = vx * vx + vy * vy;
-    if (!L2 || Math.abs(x - x0) > 300 || Math.abs(y - y0) > 300) continue;
+    if (!L2 || Math.abs(x - x0) > 400 || Math.abs(y - y0) > 400) continue;
     const t = clamp(((x - x0) * vx + (y - y0) * vy) / L2, 0, 1);
     const d = Math.hypot(x - (x0 + vx * t), y - (y0 + vy * t));
-    if (d > 30) continue;
+    if (d > maxD) continue;
     const along = P.C[i] + Math.sqrt(L2) * t;
     let pen = d;
     if (ang != null) pen += 25 * (1 - Math.cos(Math.atan2(vy, vx) - ang)) / 2;   // wrong way along a two-way road
@@ -530,27 +502,34 @@ function projectOn(P, x, y, ang, prevAlong) {
   }
   return best;
 }
-// scheduled seconds-from-trip-start at a distance along the shape, and the last stop passed
-function offAt(P, along) {
+// scheduled seconds-from-trip-start at a distance along the shape (for one run-time profile)
+function offAt(P, along, prof) {
   let prev = -1;
   for (let i = 0; i < P.d.length; i++) {
     if (P.d[i] < 0) continue;
     if (P.d[i] > along + 6) {
-      if (prev < 0) return { off: P.offs[i], prev: i - 1, atStop: -1 };
+      if (prev < 0) return { off: prof[i], prev: i - 1, atStop: -1 };
       const f = clamp((along - P.d[prev]) / ((P.d[i] - P.d[prev]) || 1), 0, 1);
-      return { off: P.offs[prev] + f * (P.offs[i] - P.offs[prev]), prev, atStop: along - P.d[prev] < 8 ? prev : -1 };
+      return { off: prof[prev] + f * (prof[i] - prof[prev]), prev, atStop: along - P.d[prev] < 8 ? prev : -1 };
     }
     prev = i;
   }
-  return { off: P.offs[P.offs.length - 1], prev: P.offs.length - 1, atStop: P.offs.length - 1 };
+  return { off: prof[prof.length - 1], prev: prof.length - 1, atStop: prof.length - 1 };
 }
-function bestTrip(P, off) {
-  const T = london(), Y = london(Date.now() - 864e5);
+// candidate trips of a pattern running today (or yesterday, past midnight) at a given position
+function bestTrip(P, along, feedMs) {
+  const base = dayStartOf(feedMs), T = london(feedMs), Y = london(feedMs - 864e5), oc = new Map();
   let best = null;
-  for (const [t0, sid] of P.trips) for (const [day, shift] of [[T, 0], [Y, 86400]]) {
-    if (!serviceOn(sid, day)) continue;
-    const delay = T.sec + shift - (t0 + off);
-    if (Math.abs(delay) <= 1500 && (!best || Math.abs(delay) < Math.abs(best.delay))) best = { t0, delay, shift };
+  for (const [t0, sid, pi] of P.trips) {
+    let o = oc.get(pi); if (!o) oc.set(pi, o = offAt(P, along, P.profiles[pi]));
+    for (const [day, back] of [[T, 0], [Y, 1]]) {
+      if (!serviceOn(sid, day)) continue;
+      const dayStart = base - back * 864e5;
+      const delay = (feedMs - (dayStart + (t0 + o.off) * 1000)) / 1000;
+      if (delay < -600 || delay > 2700) continue;
+      const cost = delay >= 0 ? delay : -3 * delay;            // running early is far rarer than running late
+      if (!best || cost < best.cost) best = { t0, sid, pi, dayStart, delay, cost, exact: false };
+    }
   }
   return best;
 }
@@ -562,65 +541,100 @@ function destSim(dest, P) {
   let n = 0; for (const w of a) if (b.has(w)) n++;
   return n / a.size;
 }
+function exactTrip(b, ang) {
+  if (!RT.size) return null;
+  let o = null; for (const k of b.keys) if ((o = RT.get(k))) break;
+  if (!o) return null;
+  const hit = TRIP_BY_HASH.get(hash8(o.trip));
+  if (!hit) return null;
+  const [P, [t0, sid, pi]] = hit;
+  const pr = projectOn(P, b.fx, b.fy, ang, b.m?.P === P ? b.m.along : null, 60) || projectOn(P, b.fx, b.fy, null, null, 200);
+  if (!pr) return null;
+  // The feed's start_date/start_time look UTC-based (an hour off the timetable's local times in summer),
+  // so near midnight its date can't be trusted: take whichever service day puts the bus nearest its timetable.
+  const base = dayStartOf(b.feedTime), off = offAt(P, pr.along, P.profiles[pi]).off;
+  const dayStart = [base, base - 864e5].sort((a, c) =>
+    Math.abs(b.feedTime - (a + (t0 + off) * 1000)) - Math.abs(b.feedTime - (c + (t0 + off) * 1000)))[0];
+  return { P, along: pr.along, trip: { t0, sid, pi, dayStart, exact: true }, how: "exact" };
+}
 function matchBus(b) {
+  const ang = b.angKnown ? b.ang : null;
+  const ex = exactTrip(b, ang);
+  if (ex) { b.m = ex; return; }
   const cands = PAT_BY_LINE.get(b.line);
   if (!cands) { b.m = null; return; }
-  const ang = b.angKnown ? b.ang : null;
+  // same journey according to the live feed: keep the trip, just move along it
+  if (b.m && b.m.how === "matched" && b.btTrip != null && b.m.btTrip === b.btTrip) {
+    const pr = projectOn(b.m.P, b.fx, b.fy, ang, b.m.along);
+    if (pr) { b.m.along = pr.along; return; }
+  }
   let best = null;
   for (const P of cands) {
-    const pr = projectOn(P, b.fx, b.fy, ang, b.m?.P === P ? b.m.along : null);
+    const pr = projectOn(P, b.fx, b.fy, ang, null);
     if (!pr) continue;
-    const o = offAt(P, pr.along), trip = bestTrip(P, o.off);
-    const score = pr.pen + (trip ? Math.abs(trip.delay) / 60 : 25) - destSim(b.dest, P) * 20 - (b.m?.P === P ? 8 : 0);
-    if (!best || score < best.score) best = { P, along: pr.along, score, trip };
+    const trip = bestTrip(P, pr.along, b.feedTime);
+    const score = pr.pen + (trip ? trip.cost / 60 : 25) - destSim(b.dest, P) * 20;
+    if (!best || score < best.score) best = { P, along: pr.along, score, trip, btTrip: b.btTrip, how: "matched" };
   }
   b.m = best;
 }
-// everything the tracking card needs, recomputed on demand
+
+// everything the tracking card and boards need (memoised for a second)
 function journey(b) {
   const m = b.m; if (!m) return null;
-  const P = m.P, o = offAt(P, m.along);
-  const age = clamp((Date.now() - b.feedTime) / 1000, 0, 180);          // it has moved on since its last report
-  const nowSec = london().sec, up = [];
+  const now = Date.now();
+  if (b._J && now - b._Jt < 1000 && b._Jm === m && b._Ja === m.along) return b._J;
+  const P = m.P, prof = m.trip ? P.profiles[m.trip.pi] : P.offs, o = offAt(P, m.along, prof);
+  const delay = m.trip ? (b.feedTime - (m.trip.dayStart + (m.trip.t0 + o.off) * 1000)) / 1000 : null;
+  const stopped = b.kmh != null && b.kmh < 3;
+  const from = stopped ? now : Math.min(b.feedTime, now);           // a bus sat in traffic isn't getting closer
+  let tpk = -1;                                                      // next timing point: an early bus waits there
+  for (let j = o.prev + 1; j < P.stops.length; j++) if (P.tp?.[j]) { tpk = j; break; }
+  const up = [];
   for (let j = o.prev + 1; j < P.stops.length; j++) {
-    const eta = Math.max(0, P.offs[j] - o.off - age);
-    up.push({ i: j, id: P.stops[j], s: stopInfo(P.stops[j]), eta, at: nowSec + eta });
+    const sched = m.trip ? m.trip.dayStart + (m.trip.t0 + prof[j]) * 1000 : null;
+    let at = from + (prof[j] - o.off) * 1000;
+    if (sched != null && delay < -30 && tpk >= 0 && j >= tpk) at = Math.max(at, sched);
+    at = Math.max(at, now);
+    up.push({ i: j, id: P.stops[j], s: stopInfo(P.stops[j]), eta: (at - now) / 1000, at, sched });
   }
-  return { P, o, up, passed: Math.max(0, o.prev + 1), total: P.stops.length, trip: m.trip,
-           prevStop: o.prev >= 0 ? stopInfo(P.stops[o.prev]) : null,
-           atStop: o.atStop >= 0 ? stopInfo(P.stops[o.atStop]) : null,
-           first: stopInfo(P.stops[0]), last: stopInfo(P.stops[P.stops.length - 1]),
-           schedEnd: m.trip ? m.trip.t0 - m.trip.shift + P.offs[P.offs.length - 1] : null };
+  const J = { P, o, up, delay, how: m.how, trip: m.trip, passed: Math.max(0, o.prev + 1), total: P.stops.length,
+    prevStop: o.prev >= 0 ? stopInfo(P.stops[o.prev]) : null, atStop: o.atStop >= 0 ? stopInfo(P.stops[o.atStop]) : null,
+    first: stopInfo(P.stops[0]), last: stopInfo(P.stops[P.stops.length - 1]),
+    startAt: m.trip ? m.trip.dayStart + m.trip.t0 * 1000 : null,
+    schedEnd: m.trip ? m.trip.dayStart + (m.trip.t0 + prof[prof.length - 1]) * 1000 : null };
+  b._J = J; b._Jt = now; b._Jm = m; b._Ja = m.along;
+  return J;
 }
-function delayText(trip) {
-  if (!trip) return { t: "no timetable match", c: "muted" };
-  const m = Math.round(trip.delay / 60);
-  if (Math.abs(trip.delay) < 90) return { t: "on time", c: "green" };
+function delayText(delay) {
+  if (delay == null) return { t: "no timetable", c: "" };
+  const m = Math.round(delay / 60);
+  if (Math.abs(delay) < 60) return { t: "on time", c: "green" };
   return m > 0 ? { t: `${m} min late`, c: "late" } : { t: `${-m} min early`, c: "early" };
 }
-// live + timetabled departures at a stop (next hour)
-function departures(stopId, horizon = 3600) {
-  const T = london(), Y = london(Date.now() - 864e5), out = [], liveTrips = new Map();
+// live + timetabled departures from a stop
+function departures(stopId, horizon = 5400) {
+  const now = Date.now(), base = dayStartOf(now), T = london(now), Y = london(now - 864e5);
+  const out = [], live = new Set();
   for (const b of buses.values()) {
     if (b.gone || !b.m) continue;
     const J = journey(b), u = J?.up.find((q) => q.id === stopId);
-    if (!u || u.i === J.total - 1) continue;                                // terminating here isn't a departure
-    out.push({ line: b.line, head: J.P.head, eta: u.eta, bus: b, trip: b.m.trip });
-    if (b.m.trip) { if (!liveTrips.has(J.P)) liveTrips.set(J.P, new Set()); liveTrips.get(J.P).add(b.m.trip.t0); }
+    if (!u || u.i === J.total - 1) continue;                       // terminating here isn't a departure
+    out.push({ line: b.line, head: J.P.head, eta: u.eta, at: u.at, bus: b, delay: J.delay, how: J.how });
+    if (b.m.trip) live.add(`${J.P.key}@${b.m.trip.t0}@${b.m.trip.dayStart}`);
   }
-  for (const P of PATTERNS) {
-    const k = P.stops.indexOf(stopId);
-    if (k < 0 || k === P.stops.length - 1) continue;
-    for (const [t0, sid] of P.trips) for (const [day, shift] of [[T, 0], [Y, 86400]]) {
+  for (const [P, k] of STOP_PATS.get(stopId) || []) {
+    if (k === P.stops.length - 1) continue;
+    for (const [t0, sid, pi] of P.trips) for (const [day, back] of [[T, 0], [Y, 1]]) {
       if (!serviceOn(sid, day)) continue;
-      const dt = t0 + P.offs[k] - shift - T.sec;
-      if (dt < -60 || dt > horizon || liveTrips.get(P)?.has(t0)) continue;
-      out.push({ line: P.line, head: P.head, eta: Math.max(0, dt), sched: true });
+      const dayStart = base - back * 864e5, at = dayStart + (t0 + P.profiles[pi][k]) * 1000, dt = (at - now) / 1000;
+      if (dt < -30 || dt > horizon || live.has(`${P.key}@${t0}@${dayStart}`)) continue;
+      out.push({ line: P.line, head: P.head, eta: Math.max(0, dt), at, sched: true });
     }
   }
-  return out.sort((a, b) => a.eta - b.eta).slice(0, 12);
+  return out.sort((a, b) => a.eta - b.eta);
 }
-// "remind me" alerts: "busId|stopId" -> already fired?
+// reminders: "busId|stopId" -> fired?
 const alerts = new Map();
 function checkAlerts() {
   for (const [k, fired] of alerts) {
@@ -722,7 +736,7 @@ function drawStops() {
     const [sx, sy] = toScreen(s.x, s.y);
     if (sx < -20 || sy < -20 || sx > CW + 20 || sy > CH + 20) continue;
     const onFocus = tp ? tp.set.has(s.id) : focus && s.l?.some((l) => focus.has(l));
-    const visited = PLAYER.stops[s.id];
+    const visited = SAVED.has(s.id);
     const r = onFocus ? r0 + DPR : r0;
     ctx.globalAlpha = (focus || tp) && !onFocus ? 0.35 : 1;
     // transit-map stop: white dot, black ring (gold when you've checked in)
@@ -824,8 +838,6 @@ function drawBuses(now) {
       ctx.fillStyle = col; ctx.fillRect(x0, y0, w, h);
       if (b.dd) { ctx.fillStyle = "rgba(255,255,255,.55)"; ctx.fillRect(x0, y0, w, 2 * DPR); }
       ctx.fillStyle = inkFor(col); ctx.fillText(b.line, sx, sy + DPR);
-      const d = PLAYER.dex[b.fleet];
-      if (d) { ctx.fillStyle = "#1b1e23"; ctx.fillRect(x0 + w - 3 * DPR, y0 - 5 * DPR, 8 * DPR, 8 * DPR); ctx.fillStyle = d.irl ? "#f7d51d" : "#92cc41"; ctx.fillRect(x0 + w - 1 * DPR, y0 - 3 * DPR, 4 * DPR, 4 * DPR); }
     }
     if (isSel) {
       const r = (small ? 14 : 22) * DPR + Math.sin(now / 180) * 2 * DPR;
@@ -856,7 +868,7 @@ function drawMe() {
   if (!ME) return;
   const [x, y] = proj(ME.lat, ME.lon), [sx, sy] = toScreen(x, y);
   ctx.strokeStyle = "rgba(32,156,238,.6)"; ctx.lineWidth = 2 * DPR; ctx.setLineDash([4 * DPR, 4 * DPR]);
-  ctx.beginPath(); ctx.arc(sx, sy, (CATCH_M / META.mpp) * cam.z * DPR, 0, 7); ctx.stroke(); ctx.setLineDash([]);
+  ctx.beginPath(); ctx.arc(sx, sy, (clamp(ME.acc || 30, 10, 300) / META.mpp) * cam.z * DPR, 0, 7); ctx.stroke(); ctx.setLineDash([]);
   const s = (6 + Math.sin(performance.now() / 300)) * DPR;
   ctx.fillStyle = "#1b1e23"; ctx.fillRect(sx - s - 2 * DPR, sy - s - 2 * DPR, 2 * s + 4 * DPR, 2 * s + 4 * DPR);
   ctx.fillStyle = "#209cee"; ctx.fillRect(sx - s, sy - s, 2 * s, 2 * s);
@@ -942,127 +954,42 @@ function pick(e) {
   return best;
 }
 
-// ================================================================ PLAYER / GAME
-const KEY = "theroute_v1";
-const PLAYER = (() => {
-  const d = { xp: 0, dex: {}, stops: {}, routes: {}, missions: null, spotsToday: {}, intro: false };
-  try { return Object.assign(d, JSON.parse(recall(KEY) || "{}")); } catch { return d; }
-})();
-const save = () => store(KEY, JSON.stringify(PLAYER));
-const TITLES = ["Rookie Spotter", "Stop Hopper", "Route Rookie", "Timetable Tactician", "Busway Baron",
-  "Citi Champion", "Depot Legend", "Fenland Phantom", "Lord of the Lines", "The Route Itself"];
-const xpFor = (lv) => 60 * (lv - 1) * (lv - 1) + 40 * (lv - 1);
-function level() { let lv = 1; while (PLAYER.xp >= xpFor(lv + 1)) lv++; return lv; }
-const title = () => TITLES[Math.min(level() - 1, TITLES.length - 1)];
-function renderLevel() {
-  const lv = level(), a = xpFor(lv), b = xpFor(lv + 1);
-  $("lvN").textContent = lv;
-  $("lvBar").value = ((PLAYER.xp - a) / (b - a)) * 100;
-  $("lvT").textContent = `${title()} · ${PLAYER.xp} XP`;
-}
-function gain(xp, why) {
-  const before = level();
-  PLAYER.xp += xp; save(); renderLevel();
-  toast(`+${xp} XP · ${why}`);
-  if (level() > before) setTimeout(() => toast(`LEVEL UP! LV ${level()} · ${title()}`), 1500);
-}
-function spot(b, irl) {
-  const d = today(), entry = PLAYER.dex[b.fleet], tKey = b.fleet + (irl ? ":irl" : "");
-  if (PLAYER.spotsToday.date !== d) PLAYER.spotsToday = { date: d };
-  if (PLAYER.spotsToday[tKey]) { toast(irl ? "Already caught this one today" : "Already spotted today. Come back tomorrow"); return; }
-  PLAYER.spotsToday[tKey] = 1;
-  let xp = 0; const why = [];
-  if (!entry) {
-    PLAYER.dex[b.fleet] = { name: b.persona.name, routes: [b.line], n: 1, first: Date.now(), dd: b.dd, irl: !!irl, line: b.line };
-    xp += irl ? 60 : 12; why.push(irl ? "caught in real life!" : "new bus");
-  } else {
-    entry.n++; if (!entry.routes.includes(b.line)) { entry.routes.push(b.line); xp += 8; why.push("new route for this bus"); }
-    if (irl && !entry.irl) { entry.irl = true; xp += 50; why.push("caught in real life!"); }
-    xp += irl ? 15 : 3; if (!why.length) why.push(irl ? "caught again" : "spotted again");
-  }
-  if (!PLAYER.routes[b.line]) { PLAYER.routes[b.line] = 0; xp += 20; why.push(`first ${b.line}`); }
-  PLAYER.routes[b.line]++;
-  if (b.dd) xp = Math.round(xp * 1.25);
-  missionEvent(irl ? "catch" : "spot", b);
-  gain(xp, why.join(" · "));
-  renderCard(); renderPanel();
-}
-function checkIn(s) {
-  if (PLAYER.stops[s.id]) { toast("Already checked in here"); return; }
-  PLAYER.stops[s.id] = Date.now();
-  missionEvent("checkin", s);
-  gain(25, `checked in at ${s.name}`);
-  renderCard(); renderPanel();
-}
-function ensureMissions() {
-  const d = today();
-  if (PLAYER.missions?.date === d) return;
-  const lines = [...new Set([...buses.values()].map((b) => b.line).filter((l) => l && l !== "?"))];
-  if (!lines.length) return;
-  const h = hash(d), pickLine = lines[h % lines.length];
-  const third = [
-    { id: "dd", text: "Spot 2 double-deckers", goal: 2, xp: 40 },
-    { id: "checkin", text: "Check in at a real bus stop (GPS)", goal: 1, xp: 80 },
-    { id: "catch", text: "Catch a bus in real life (within 80 m)", goal: 1, xp: 120 },
-    { id: "routes", text: "Spot buses on 4 different routes", goal: 4, xp: 50 },
-  ][(h >>> 4) % 4];
-  PLAYER.missions = { date: d, list: [
-    { id: "spot", text: "Spot 5 different buses", goal: 5, xp: 40, p: 0, seen: [] },
-    { id: "line", line: pickLine, text: `Spot a bus on route ${pickLine}`, goal: 1, xp: 30, p: 0 },
-    Object.assign({ p: 0, seen: [] }, third),
-  ] };
-  save();
-}
-function missionEvent(kind, obj) {
-  ensureMissions();
-  const M = PLAYER.missions; if (!M) return;
-  const bus = kind === "spot" || kind === "catch";
-  for (const m of M.list) {
-    if (m.p >= m.goal) continue;
-    let hit = false;
-    if (m.id === "spot" && bus && !m.seen.includes(obj.fleet)) { m.seen.push(obj.fleet); hit = true; }
-    if (m.id === "line" && bus && obj.line === m.line) hit = true;
-    if (m.id === "dd" && bus && obj.dd && !m.seen.includes(obj.fleet)) { m.seen.push(obj.fleet); hit = true; }
-    if (m.id === "routes" && bus && !m.seen.includes(obj.line)) { m.seen.push(obj.line); hit = true; }
-    if (m.id === "checkin" && kind === "checkin") hit = true;
-    if (m.id === "catch" && kind === "catch") hit = true;
-    if (hit) { m.p++; if (m.p >= m.goal) setTimeout(() => gain(m.xp, `quest complete: ${m.text}`), 1700); }
-  }
-  save();
-}
-
-// ---- GPS: real-world catching
+// ================================================================ MY LOCATION
 let ME = null, watchId = null;
-$("bGps").onclick = () => {
-  if (watchId != null) { navigator.geolocation.clearWatch(watchId); watchId = null; ME = null; $("bGps").classList.remove("is-primary"); toast("GPS off"); return; }
-  if (!navigator.geolocation) { toast("No GPS on this device"); return; }
+function startGps() {
+  if (watchId != null) return;
+  if (!navigator.geolocation) { toast("This device can't share its location"); return; }
   watchId = navigator.geolocation.watchPosition((p) => {
     const first = !ME;
     ME = { lat: p.coords.latitude, lon: p.coords.longitude, acc: p.coords.accuracy };
     if (first) {
       $("bGps").classList.add("is-primary");
       const [x, y] = proj(ME.lat, ME.lon);
-      if (x >= 0 && y >= 0 && x <= META.W && y <= META.H) { cam.x = x; cam.y = y; cam.z = Math.max(cam.z, 2.5); toast("You're on the map. Go find a bus!"); }
-      else toast("You're outside the map. Catching only works in Cambridge");
+      if (x >= 0 && y >= 0 && x <= META.W && y <= META.H) { following = null; cam.x = x; cam.y = y; cam.z = Math.max(cam.z, 2.4); }
+      else toast("You're outside the Cambridge map. Showing the map centre instead");
+      setTab("nearby");
     }
-    renderCard();
-  }, () => toast("Location blocked. Allow it in your browser settings"), { enableHighAccuracy: true, maximumAge: 5000 });
-};
+    if (tab === "nearby") renderPanel();
+  }, () => { toast("Location blocked. Allow it in your browser settings"); stopGps(); },
+  { enableHighAccuracy: true, maximumAge: 10000 });
+}
+function stopGps() { if (watchId != null) navigator.geolocation.clearWatch(watchId); watchId = null; ME = null; $("bGps").classList.remove("is-primary"); }
+$("bGps").onclick = () => (watchId != null ? (stopGps(), renderPanel()) : startGps());
 const distM = (lat1, lon1, lat2, lon2) => Math.hypot((lon2 - lon1) * META.mPerDegLon, (lat2 - lat1) * META.mPerDegLat);
 function meTo(x, y) { if (!ME) return null; const [la, lo] = unproj(x, y); return distM(ME.lat, ME.lon, la, lo); }
 
-// ================================================================ UI: card
+// ================================================================ CARD
 let sel = null;
 function select(p) {
   sel = p; following = null;
   if (p.type === "bus") {
-    // tapping a bus = start tracking it
     const b = buses.get(p.id);
-    if (b) { following = b.id; cam.z = Math.max(cam.z, 2.2); }
+    if (b) { following = b.id; cam.z = Math.max(cam.z, 2.2); }           // tapping a bus = tracking it
   } else if (p.type === "stop") {
     const s = STOP_BY_ID.get(p.id);
     if (s) { cam.x = s.x; cam.y = s.y; cam.z = Math.max(cam.z, 2.4); }
   }
+  showAllStops = false;
   renderCard(); showRecenter();
 }
 function closeCard() { sel = null; following = null; renderCard(); showRecenter(); }
@@ -1072,85 +999,85 @@ function nearestStop(x, y) {
   for (const s of STOPS) { const d = Math.hypot(s.x - x, s.y - y); if (d < bd) { bd = d; best = s; } }
   return best && bd < 60 ? best : null;
 }
-const chip = (l) => `<span class="chip" data-line="${esc(l)}" style="background:${routeColour(l)};color:${inkFor(routeColour(l))}">${esc(l)}</span>`;
 let showAllStops = false;
+const HOW = {
+  exact: "Exact trip: the live feed names the timetabled journey this bus is running.",
+  matched: "Trip inferred from the bus's position, direction and destination against today's timetable.",
+};
 
 function busCard(b) {
-  const J = journey(b), dt = delayText(J?.trip), dex = PLAYER.dex[b.fleet];
-  const dm = meTo(b.x, b.y), canCatch = dm != null && dm <= CATCH_M + Math.min(ME?.acc || 0, 30);
-  const spottedToday = PLAYER.spotsToday.date === today() && PLAYER.spotsToday[b.fleet];
-  const near = nearestStop(b.fx, b.fy);
+  const J = journey(b), dt = delayText(J?.delay), near = nearestStop(b.fx, b.fy);
+  const age = Math.max(0, Math.round((Date.now() - b.feedTime) / 1000));
   let where;
   if (J?.atStop) where = `At <b>${esc(stopLabel(J.atStop))}</b>`;
   else if (J?.prevStop && J.up[0]) where = `Between <b>${esc(J.prevStop.name)}</b> and <b>${esc(J.up[0].s.name)}</b>`;
   else if (J?.up[0]) where = `Heading for <b>${esc(J.up[0].s.name)}</b>`;
   else where = near ? `Near <b>${esc(stopLabel(near))}</b>` : "Between stops";
-  const street = (J?.up[0]?.s.street) || near?.street;
-  const area = (J?.up[0]?.s.loc) || near?.loc;
+  const ref = J?.up[0]?.s.street ? J.up[0].s : near;
   const pct = J ? Math.round((J.passed / Math.max(1, J.total - 1)) * 100) : 0;
-  const ups = J ? (showAllStops ? J.up : J.up.slice(0, 6)) : [];
+  const ups = J ? (showAllStops ? J.up : J.up.slice(0, 8)) : [];
   const lastU = J?.up[J.up.length - 1];
+  const dm = meTo(b.x, b.y);
   return `
     <p class="title">TRACKING</p>
     <div class="head">${pill(b.line, true)}<h2>→ ${esc(b.dest || J?.P.head || "not in service")}</h2><span class="x" id="cx" title="Stop tracking">✕</span></div>
     <div class="status">
-      <span class="tagx ${dt.c}">${esc(dt.t)}</span>
+      <span class="tagx ${dt.c}" title="${esc(J ? HOW[J.how] : "")}">${esc(dt.t)}${J?.how === "exact" ? " ✓" : ""}</span>
       <span class="tagx">${b.kmh == null ? "speed: measuring" : b.kmh < 3 ? "stopped" : Math.round(b.kmh) + " km/h"}</span>
       <span class="tagx">${b.dd ? "double deck" : "single deck"}</span>
     </div>
-    <div class="where">📍 ${where}${street ? `<br><span class="muted">on ${esc(street)}${area ? ", " + esc(area) : ""}</span>` : ""}</div>
+    <div class="where">📍 ${where}${ref?.street || ref?.loc ? `<br><span class="muted">${esc([ref.street, ref.loc].filter(Boolean).join(", "))}</span>` : ""}
+      <br><span class="muted">position reported ${age < 5 ? "just now" : age + " s ago"}${dm != null ? ` · ${distTxt(dm)} from you` : ""}</span></div>
     ${J ? `
     <div class="journey">
-      <div class="ends"><span>${esc(J.first.name)}</span><span>${esc(J.last.name)}</span></div>
+      <div class="ends"><span>${esc(J.first.name)}${J.startAt ? " " + hm(J.startAt) : ""}</span><span>${esc(J.last.name)}</span></div>
       <div class="track"><i style="width:${pct}%"></i><b style="left:${pct}%"></b></div>
-      <div class="muted">stop ${Math.min(J.passed + 1, J.total)} of ${J.total}${lastU ? ` · arrives ${clock(lastU.at)} (${mins(lastU.eta)})` : ""}${J.schedEnd != null ? ` · due ${clock(J.schedEnd)}` : ""}</div>
+      <div class="muted">stop ${Math.min(J.passed + 1, J.total)} of ${J.total}${lastU ? ` · arrives ${hm(lastU.at)} (${mins(lastU.eta)})` : ""}${J.schedEnd ? ` · timetabled ${hm(J.schedEnd)}` : ""}</div>
     </div>
     <h3>NEXT STOPS</h3>
     <ul class="eta">${ups.map((u, k) => {
       const key = b.id + "|" + u.id, on = alerts.has(key);
       return `<li data-stop="${esc(u.id)}" class="${k === 0 ? "next" : ""}${u.s.ext ? " ext" : ""}">
-        <span class="dot"></span><span class="nm">${esc(stopLabel(u.s))}</span>
-        <span class="in">${mins(u.eta)}</span><span class="at">${clock(u.at)}</span>
-        <button class="bell ${on ? "on" : ""}" data-alert="${esc(key)}" title="Remind me 2 min before it gets here">${on ? "⏰" : "🔔"}</button></li>`;
+        <span class="dot"></span><span class="nm">${esc(stopLabel(u.s))}${u.sched != null && hm(u.sched) !== hm(u.at) ? `<small>timetabled ${hm(u.sched)}</small>` : ""}</span>
+        <span class="in">${mins(u.eta)}</span><span class="at">${hm(u.at)}</span>
+        <button class="bell ${on ? "on" : ""}" data-alert="${esc(key)}" title="Alert me 2 min before it gets here">${on ? "⏰" : "🔔"}</button></li>`;
     }).join("")}</ul>
-    ${J.up.length > 6 ? `<button class="nes-btn more" id="aMore">${showAllStops ? "show fewer" : `show all ${J.up.length} stops`}</button>` : ""}`
-    : `<p class="muted" style="margin:10px 0 0">No timetable for this service in the open data, so no stop-by-stop times. Position and speed are still live.</p>`}
-    <div class="acts">
-      <button class="nes-btn ${spottedToday ? "is-disabled" : "is-warning"}" id="aSpot">${spottedToday ? "✓ SPOTTED" : "◉ SPOT IT"}</button>
-      ${canCatch ? `<button class="nes-btn is-success" id="aCatch">★ CATCH!</button>` : ""}
-      <a class="nes-btn" href="https://bustimes.org${esc(b.url)}" target="_blank" rel="noopener">history ↗</a>
+    ${J.up.length > 8 ? `<button class="nes-btn more" id="aMore">${showAllStops ? "show fewer" : `show all ${J.up.length} stops`}</button>` : ""}
+    <p class="note">${esc(HOW[J.how])}${J.how === "matched" && !relayLive() ? " Connect the live relay for exact trips (see README)." : ""}</p>`
+    : `<p class="note">This service isn't in the open timetable data, so there are no stop-by-stop times. Its position and speed are still live.</p>`}
+    <div class="kv">
+      <span>vehicle</span><span>${esc(b.fleet)}${b.reg ? " · " + esc(b.reg) : ""}</span>
+      <span>type</span><span>${esc(b.features || "—")}</span>
     </div>
-    <details class="about"><summary>about this bus</summary>
-      <div class="who">${esc(b.persona.name)}</div>
-      <div class="nes-balloon from-left is-dark"><p style="margin:0">"${esc(b.persona.trait)}"</p></div>
-      <div class="kv">
-        <span>vehicle</span><span>${esc(b.fleet)}</span>
-        <span>type</span><span>${esc(b.features || "single deck")}</span>
-        ${dm != null ? `<span>you</span><span>${dm < 1000 ? Math.round(dm) + " m away" : (dm / 1000).toFixed(1) + " km away"}</span>` : ""}
-        <span>busdex</span><span>${dex ? `spotted ${dex.n}×${dex.irl ? ' · <span class="gold">caught IRL ★</span>' : ""}` : '<span class="muted">not spotted yet</span>'}</span>
-      </div>
-    </details>`;
+    <div class="acts">
+      ${following === b.id ? "" : `<button class="nes-btn is-primary" id="aFollow">◎ follow</button>`}
+      <a class="nes-btn" href="https://bustimes.org${esc(b.url)}" target="_blank" rel="noopener">vehicle ↗</a>
+    </div>`;
+}
+
+function depRows(list, n = 12) {
+  return list.slice(0, n).map((d) => {
+    const st = d.bus ? delayText(d.delay) : null;
+    return `<li ${d.bus ? `data-id="${d.bus.id}"` : ""}>${pill(d.line)}<span class="nm">${esc(d.head)}</span>
+      <span class="in">${mins(d.eta)}</span><span class="at">${hm(d.at)}</span>
+      <span class="src ${d.bus ? (st.c || "live") : ""}">${d.bus ? (d.delay == null ? "live" : st.t) : "timetable"}</span></li>`;
+  }).join("");
 }
 
 function stopCard(s) {
   const deps = departures(s.id);
-  const dm = meTo(s.x, s.y), can = dm != null && dm <= CHECKIN_M + Math.min(ME?.acc || 0, 30), done = PLAYER.stops[s.id];
+  const dm = meTo(s.x, s.y), saved = SAVED.has(s.id);
   return `
     <p class="title">STOP</p>
-    <div class="head"><span class="rt big" style="background:#fff">⬤</span><h2>${esc(s.name)}${s.ind ? ` <span class="muted">(${esc(s.ind)})</span>` : ""}<br><span class="muted">${esc([s.street, s.loc].filter(Boolean).join(", "))}</span></h2><span class="x" id="cx">✕</span></div>
+    <div class="head"><span class="sd"></span><h2>${esc(s.name)}${s.ind ? ` <span class="muted">(${esc(s.ind)})</span>` : ""}<br><span class="muted">${esc([s.street, s.loc].filter(Boolean).join(", "))}${dm != null ? ` · ${distTxt(dm)} from you` : ""}</span></h2><span class="x" id="cx">✕</span></div>
     <h3>ROUTES HERE</h3>
     <div class="chips">${(s.l || []).map(chip).join("") || '<span class="muted">no timetabled routes</span>'}</div>
-    <h3>DEPARTURES · NEXT HOUR</h3>
-    <ul class="eta board">${deps.length ? deps.map((d) => `
-      <li ${d.bus ? `data-id="${d.bus.id}"` : ""}>${pill(d.line)}<span class="nm">${esc(d.head)}</span>
-        <span class="in">${mins(d.eta)}</span>
-        <span class="src ${d.bus ? "live" : ""}">${d.bus ? (d.trip ? delayText(d.trip).t.replace("no timetable match", "live") : "live") : "timetable"}</span></li>`).join("")
-      : '<li class="muted">nothing due in the next hour</li>'}</ul>
-    <p class="muted" style="margin:6px 0 0"><span class="src live">LIVE</span> = a real bus you can tap and track · otherwise the timetable</p>
-    ${dm != null ? `<p class="muted" style="margin:8px 0 0">you are ${Math.round(dm)} m away</p>` : ""}
+    <h3>DEPARTURES</h3>
+    <ul class="eta">${deps.length ? depRows(deps) : '<li class="muted">nothing due in the next 90 minutes</li>'}</ul>
+    <p class="note">Coloured = a live bus (tap to track it) · "timetable" = no bus on the road yet</p>
     <div class="acts">
-      ${done ? `<button class="nes-btn is-disabled">✓ CHECKED IN</button>` : can ? `<button class="nes-btn is-success" id="aCheck">★ CHECK IN +25</button>` : `<button class="nes-btn is-disabled" title="Go there in real life with GPS on">CHECK IN: GO THERE</button>`}
-      <a class="nes-btn" href="https://bustimes.org/stops/${esc(s.id)}" target="_blank" rel="noopener">full times ↗</a>
+      <button class="nes-btn ${saved ? "is-warning" : ""}" id="aSave">${saved ? "★ saved" : "☆ save stop"}</button>
+      <a class="nes-btn" href="https://bustimes.org/stops/${esc(s.id)}" target="_blank" rel="noopener">full timetable ↗</a>
     </div>`;
 }
 
@@ -1160,33 +1087,31 @@ function lineCard(line) {
   return `
     <p class="title">ROUTE</p>
     <div class="head">${pill(line, true)}<h2>${esc(R?.heads?.slice(0, 2).join(" ⇄ ") || "")}</h2><span class="x" id="cx">✕</span></div>
-    <h3>${list.length} BUS${list.length === 1 ? "" : "ES"} ON THIS ROUTE NOW</h3>
-    <ul class="eta board">${list.map(({ b, J }) => `
-      <li data-id="${b.id}"><span class="nm">→ ${esc(b.dest || J?.P.head || "?")}<br><span class="muted">${J?.up[0] ? "next: " + esc(J.up[0].s.name) + " · " + mins(J.up[0].eta) : "position live"}</span></span>
-      <span class="src ${delayText(J?.trip).c}">${esc(J ? delayText(J.trip).t : "live")}</span></li>`).join("") || '<li class="muted">none running right now</li>'}</ul>
-    <p class="muted" style="margin:8px 0 0">Tap a bus to track it.</p>`;
+    <h3>${list.length} BUS${list.length === 1 ? "" : "ES"} RUNNING</h3>
+    <ul class="eta">${list.map(({ b, J }) => {
+      const st = delayText(J?.delay);
+      return `<li data-id="${b.id}"><span class="nm">→ ${esc(b.dest || J?.P.head || "?")}<small>${J?.up[0] ? "next: " + esc(J.up[0].s.name) + " · " + mins(J.up[0].eta) : "position live"}</small></span>
+        <span class="src ${st.c}">${esc(J ? st.t : "live")}</span></li>`;
+    }).join("") || '<li class="muted">none running right now</li>'}</ul>
+    <p class="note">Tap a bus to track it.</p>`;
 }
 
 function renderCard() {
   const el = $("card");
   document.querySelector("aside").classList.toggle("has-card", !!sel);
-  if (!sel) { el.classList.remove("show"); el.innerHTML = ""; return; }
-  el.classList.add("show");
+  if (!sel) { el.innerHTML = ""; return; }
   if (sel.type === "bus") {
     const b = buses.get(sel.id);
     if (!b) { closeCard(); toast("That bus has finished its journey"); return; }
-    const open = el.querySelector("details.about")?.open;
     el.innerHTML = busCard(b);
-    if (open) el.querySelector("details.about").open = true;
-    if (!(PLAYER.spotsToday.date === today() && PLAYER.spotsToday[b.fleet])) $("aSpot").onclick = () => spot(b, false);
-    if ($("aCatch")) $("aCatch").onclick = () => spot(b, true);
     if ($("aMore")) $("aMore").onclick = () => { showAllStops = !showAllStops; renderCard(); };
+    if ($("aFollow")) $("aFollow").onclick = () => { following = b.id; cam.z = Math.max(cam.z, 2.2); renderCard(); showRecenter(); };
     el.querySelectorAll("[data-alert]").forEach((x) => x.onclick = (e) => {
       e.stopPropagation();
       const k = x.dataset.alert;
-      if (alerts.has(k)) { alerts.delete(k); toast("Reminder off"); }
+      if (alerts.has(k)) { alerts.delete(k); toast("Alert off"); }
       else {
-        alerts.set(k, false); toast("⏰ I'll remind you 2 min before it arrives");
+        alerts.set(k, false); toast("⏰ You'll get an alert 2 min before it arrives");
         try { if (window.Notification && Notification.permission === "default") Notification.requestPermission(); } catch {}
       }
       renderCard();
@@ -1199,7 +1124,11 @@ function renderCard() {
     const s = STOP_BY_ID.get(sel.id);
     if (!s) { closeCard(); return; }
     el.innerHTML = stopCard(s);
-    if ($("aCheck")) $("aCheck").onclick = () => checkIn(s);
+    $("aSave").onclick = () => {
+      if (SAVED.has(s.id)) SAVED.delete(s.id); else SAVED.add(s.id);
+      saveSaved(); toast(SAVED.has(s.id) ? "Saved: it's in the SAVED tab" : "Removed from saved");
+      renderCard(); if (tab === "saved") renderPanel();
+    };
   } else {
     el.innerHTML = lineCard(sel.id);
   }
@@ -1208,20 +1137,120 @@ function renderCard() {
   $("cx").onclick = closeCard;
 }
 
-// ---- search: stops and routes
+// ================================================================ PANEL
+let tab = "nearby";
+function setTab(t) {
+  tab = t;
+  document.querySelectorAll(".tabs .nes-btn").forEach((x) => x.classList.toggle("is-warning", x.dataset.tab === t));
+  renderPanel();
+}
+document.querySelectorAll(".tabs .nes-btn").forEach((b) => b.onclick = () => setTab(b.dataset.tab));
+
+function stopBox(s, extra = "") {
+  const deps = departures(s.id, 3600).slice(0, 4);
+  return `<div class="stopbox" data-stop="${esc(s.id)}">
+    <div class="top"><span class="sd"></span><span class="nm">${esc(stopLabel(s))}</span><span class="muted">${extra}</span></div>
+    <div class="deps">${deps.length ? deps.map((d) => `<span>${pill(d.line)} ${mins(d.eta)}${d.bus ? "" : '<span class="muted">*</span>'}</span>`).join("") : '<span class="muted">nothing in the next hour</span>'}</div>
+  </div>`;
+}
+let nearbyAt = null;
+function renderPanel() {
+  const P = $("panel");
+  if (!META) return;
+  if (tab === "nearby") {
+    let ox = cam.x, oy = cam.y, from = "the map centre";
+    if (ME) { const [x, y] = proj(ME.lat, ME.lon); if (x >= 0 && y >= 0 && x <= META.W && y <= META.H) { ox = x; oy = y; from = "you"; } }
+    nearbyAt = [ox, oy];
+    const seen = new Set(), list = [];
+    for (const s of [...STOPS].sort((a, b) => Math.hypot(a.x - ox, a.y - oy) - Math.hypot(b.x - ox, b.y - oy))) {
+      if (list.length >= 6 || metres(Math.hypot(s.x - ox, s.y - oy)) > 1500) break;
+      const k = s.name + "|" + s.ind; if (seen.has(k)) continue; seen.add(k); list.push(s);
+    }
+    P.innerHTML = `
+      <h3 style="margin-top:4px">STOPS NEAR ${from === "you" ? "YOU" : "THE MAP CENTRE"}</h3>
+      ${from === "you" ? "" : `<p class="note" style="margin:0 0 10px">Move the map, or <a href="#" id="pGps">use my location</a>.</p>`}
+      ${list.map((s) => stopBox(s, distTxt(metres(Math.hypot(s.x - ox, s.y - oy))))).join("") || '<p class="muted">No stops within 1.5 km.</p>'}
+      <p class="note">* = timetable only (no bus on the road yet). Tap a stop for the full board.</p>`;
+    const g = $("pGps"); if (g) g.onclick = (e) => { e.preventDefault(); startGps(); };
+  } else if (tab === "routes") {
+    const by = new Map();
+    for (const b of buses.values()) {
+      if (b.gone) continue;
+      let r = by.get(b.line); if (!r) by.set(b.line, r = { line: b.line, n: 0, delays: [] });
+      r.n++; const J = journey(b); if (J?.delay != null) r.delays.push(J.delay);
+    }
+    const running = [...by.values()].sort((a, b) => String(a.line).localeCompare(String(b.line), undefined, { numeric: true }));
+    const idle = [...ROUTES.keys()].filter((l) => !by.has(l)).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+    P.innerHTML = `
+      <h3 style="margin-top:4px">RUNNING NOW</h3>
+      ${running.map((r) => {
+        const avg = r.delays.length ? r.delays.reduce((a, b) => a + b, 0) / r.delays.length : null, st = delayText(avg);
+        return `<div class="row" data-line="${esc(r.line)}">${pill(r.line)}<span class="g">${esc(ROUTES.get(r.line)?.heads?.slice(0, 2).join(" ⇄ ") || "")}</span>
+          <span class="muted">${r.n} bus${r.n > 1 ? "es" : ""}</span><span class="src ${st.c}">${avg == null ? "live" : (Math.abs(avg) < 60 ? "on time" : st.t.replace(" late", " late avg").replace(" early", " early avg"))}</span></div>`;
+      }).join("") || '<p class="muted">Loading…</p>'}
+      ${idle.length ? `<h3>NOT RUNNING NOW</h3><div class="chips">${idle.map(chip).join("")}</div>` : ""}
+      <p class="note">Live: bustimes.org / Bus Open Data Service (OGL) · timetables: BODS · map: OpenStreetMap contributors · stops: NaPTAN</p>`;
+    P.querySelectorAll("[data-line]").forEach((r) => r.onclick = () => focusLine(r.dataset.line));
+  } else {
+    const list = [...SAVED].map((id) => STOP_BY_ID.get(id)).filter(Boolean);
+    P.innerHTML = `<h3 style="margin-top:4px">SAVED STOPS</h3>` + (list.length ? list.map((s) => stopBox(s)).join("")
+      : `<p class="muted">Open any stop and press ☆ save stop. Its departures will show here.</p>`);
+  }
+  P.querySelectorAll(".stopbox").forEach((d) => d.onclick = () => select({ type: "stop", id: d.dataset.stop }));
+}
+
+function focusLine(line) {
+  sel = { type: "line", id: line }; following = null; renderCard(); showRecenter();
+  const R = ROUTES.get(line);
+  const xs = [...buses.values()].filter((b) => b.line === line).map((b) => [b.x, b.y]);
+  if (R) for (const p of R.raw) for (let i = 0; i < p.length; i += 8) xs.push([p[i] / 2, p[i + 1] / 2]);
+  if (!xs.length) return;
+  const X = xs.map((p) => p[0]), Y = xs.map((p) => p[1]);
+  cam.x = (Math.min(...X) + Math.max(...X)) / 2; cam.y = (Math.min(...Y) + Math.max(...Y)) / 2;
+  const span = Math.max(Math.max(...X) - Math.min(...X), (Math.max(...Y) - Math.min(...Y)) * (CW / CH), 150);
+  cam.z = clamp(CW / DPR / (span * 1.15), 0.3, 3); clampCam();
+}
+function renderLegend() {
+  const lines = [...new Set([...buses.values()].filter((b) => !b.gone).map((b) => b.line))].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+  const L = $("legend");
+  L.innerHTML = lines.map((l) => `<span class="chip ${hiddenRoutes.has(l) ? "off" : ""}" data-l="${esc(l)}" style="background:${routeColour(l)};color:${inkFor(routeColour(l))}" title="tap to hide/show">${esc(l)}</span>`).join("")
+    + (hiddenRoutes.size ? `<span class="chip all" data-all="1">show all</span>` : "");
+  L.querySelectorAll("[data-l]").forEach((el) => el.onclick = () => {
+    const l = el.dataset.l; hiddenRoutes.has(l) ? hiddenRoutes.delete(l) : hiddenRoutes.add(l); renderLegend();
+  });
+  const all = L.querySelector("[data-all]"); if (all) all.onclick = () => { hiddenRoutes.clear(); renderLegend(); };
+}
+function onLiveUpdate() { renderLegend(); renderPanel(); if (sel) renderCard(); }
+function tickStatus() {
+  const age = lastOk ? Math.round((Date.now() - lastOk) / 1000) : null;
+  const all = [...buses.values()].filter((b) => !b.gone), exact = all.filter((b) => b.m?.how === "exact").length;
+  $("status").textContent = age == null ? "connecting…" : `${all.length} buses live · ${age}s ago`;
+  $("dot").classList.toggle("stale", age == null || age > 60);
+  $("clock").textContent = hm(Date.now());
+  const acc = $("acc");
+  if (relayLive()) {
+    acc.className = "exact"; acc.textContent = `EXACT TRIPS ${exact}/${all.length}`;
+    acc.title = "The official live feed names the timetabled trip for these buses, so early/late and arrival times are computed against their real timetable.";
+  } else {
+    acc.className = "est"; acc.textContent = "ESTIMATED TRIPS";
+    acc.title = RELAY ? `Live relay not answering (${rtErr || "no data yet"}). Trips are inferred from position.` : "Trips are inferred from each bus's position, direction and destination. Deploy the relay in worker/ for exact trips.";
+  }
+}
+
+// ================================================================ SEARCH
 function runSearch() {
   const q = $("q").value.trim().toLowerCase(), R = $("results");
   if (!q) { R.innerHTML = ""; R.hidden = true; return; }
   const lines = [...new Set([...ROUTES.keys(), ...[...buses.values()].map((b) => b.line)])]
-    .filter((l) => l.toLowerCase() === q || (q.length >= 1 && l.toLowerCase().startsWith(q))).slice(0, 6);
-  // names beat streets, starts-of-names beat the middle; apostrophes don't matter
+    .filter((l) => l.toLowerCase().startsWith(q)).slice(0, 6);
+  // names beat areas beat streets; apostrophes don't matter
   const norm = (t) => String(t || "").toLowerCase().replace(/['’]/g, "");
   const nq = norm(q), seen = new Set(), scored = [];
   for (const s of STOPS) {
     const n = norm(s.name), lo = norm(s.loc), st = norm(s.street);
     const score = n.startsWith(nq) ? 0 : n.includes(" " + nq) ? 1 : lo.startsWith(nq) ? 1.5 : n.includes(nq) ? 2 : (st + " " + lo).includes(nq) ? 3 : -1;
     if (score < 0) continue;
-    const k = s.name + "|" + s.loc; if (seen.has(k)) continue; seen.add(k);   // one row per place, not per bay
+    const k = s.name + "|" + s.loc; if (seen.has(k)) continue; seen.add(k);
     scored.push([score + (s.l?.length ? 0 : 0.5), s]);
   }
   const stops = scored.sort((a, b) => a[0] - b[0] || (b[1].l?.length || 0) - (a[1].l?.length || 0)).slice(0, 8).map((x) => x[1]);
@@ -1239,98 +1268,8 @@ $("q").addEventListener("keydown", (e) => {
   if (e.key === "Enter") $("results").querySelector("[data-line],[data-stop]")?.click();
 });
 
-// ================================================================ UI: panel
-let tab = "live";
-document.querySelectorAll(".tabs .nes-btn").forEach((b) => b.onclick = () => {
-  tab = b.dataset.tab;
-  document.querySelectorAll(".tabs .nes-btn").forEach((x) => x.classList.toggle("is-warning", x === b));
-  renderPanel();
-});
-function liveStats() {
-  const by = new Map();
-  for (const b of buses.values()) {
-    if (b.gone) continue;
-    let r = by.get(b.line); if (!r) by.set(b.line, r = { line: b.line, n: 0, speeds: [], dests: new Set() });
-    r.n++; if (b.kmh != null) r.speeds.push(b.kmh); if (b.dest) r.dests.add(b.dest);
-  }
-  for (const r of by.values()) r.avg = r.speeds.length ? r.speeds.reduce((a, b) => a + b, 0) / r.speeds.length : null;
-  return [...by.values()];
-}
-function renderPanel() {
-  const P = $("panel");
-  if (tab === "live") {
-    const rs = liveStats().sort((a, b) => b.n - a.n || String(a.line).localeCompare(b.line));
-    const all = [...buses.values()].filter((b) => !b.gone), moving = all.filter((b) => b.kmh != null);
-    const fast = moving.slice().sort((a, b) => b.kmh - a.kmh)[0];
-    const ranked = rs.filter((r) => r.avg != null).sort((a, b) => b.avg - a.avg);
-    const top = ranked[0]?.avg || 1;
-    P.innerHTML = `
-      <div class="stats"><div><b>${all.length}</b><span>buses live</span></div><div><b>${rs.length}</b><span>routes</span></div><div><b>${moving.filter((b) => b.kmh < 3).length}</b><span>stopped</span></div></div>
-      ${fast && fast.kmh > 1 ? `<div class="row click" data-id="${fast.id}">${pill(fast.line)}<span class="g">⚡ fastest: ${esc(fast.persona.name)}</span><span class="v">${Math.round(fast.kmh)} km/h</span></div>` : ""}
-      <h3>ROUTE RACE · AVG SPEED NOW</h3>
-      ${ranked.length ? ranked.map((r, i) => `<div class="row click" data-line="${esc(r.line)}"><span class="n">${i + 1}</span>${pill(r.line)}<span class="g">${esc([...r.dests].slice(0, 2).join(" ⇄ "))}</span><span class="bar"><i style="width:${(r.avg / top) * 100}%"></i></span><span class="v">${Math.round(r.avg)}</span></div>`).join("")
-        : `<p class="muted">Measuring. Speeds appear once buses report a second position (~30 s).</p>`}
-      <h3>ON THE ROAD</h3>
-      ${rs.map((r) => `<div class="row click" data-line="${esc(r.line)}">${pill(r.line)}<span class="g">${esc([...r.dests].join(" · ") || "—")}</span><span class="v">${r.n}×</span></div>`).join("")}
-      <p class="muted" style="margin-top:16px">Live: <a href="https://bustimes.org" target="_blank" rel="noopener">bustimes.org</a> / Bus Open Data Service (OGL) · routes: BODS timetables · map: OpenStreetMap contributors · stops: NaPTAN</p>`;
-    P.querySelectorAll("[data-id]").forEach((r) => r.onclick = () => select({ type: "bus", id: +r.dataset.id }));
-    P.querySelectorAll("[data-line]").forEach((r) => r.onclick = () => focusLine(r.dataset.line));
-  } else if (tab === "missions") {
-    ensureMissions();
-    const M = PLAYER.missions, visited = Object.keys(PLAYER.stops).length;
-    P.innerHTML = `<h3 style="margin-top:4px">TODAY'S QUESTS · ${today()}</h3>` + (M ? M.list.map((m) => `
-      <div class="mission ${m.p >= m.goal ? "done" : ""}"><div class="t"><span>${m.p >= m.goal ? '<span class="green">✓</span> ' : ""}${esc(m.text)}</span><span class="xpv">+${m.xp} XP</span></div>
-      <progress class="nes-progress ${m.p >= m.goal ? "is-success" : "is-primary"}" value="${Math.min(m.p, m.goal)}" max="${m.goal}"></progress>
-      <div class="muted" style="margin-top:4px">${Math.min(m.p, m.goal)} / ${m.goal}</div></div>`).join("")
-      : `<p class="muted">Quests unlock when the first live buses load.</p>`) + `
-      <h3>STOP COLLECTION</h3>
-      <div class="stats"><div><b>${visited}</b><span>of ${STOPS.length}</span></div><div><b>${(visited / STOPS.length * 100).toFixed(1)}%</b><span>of the city</span></div><div><b>${Object.values(PLAYER.dex).filter((d) => d.irl).length}</b><span>caught IRL</span></div></div>
-      <p class="muted">Turn on <span class="gold">◎ GPS</span> when you're out. Stops you check in at turn gold.</p>`;
-  } else {
-    const dex = Object.entries(PLAYER.dex).sort((a, b) => b[1].first - a[1].first);
-    const routes = Object.entries(PLAYER.routes).sort((a, b) => b[1] - a[1]);
-    P.innerHTML = `
-      <div class="stats"><div><b>${dex.length}</b><span>buses</span></div><div><b>${routes.length}</b><span>routes</span></div><div><b>${dex.filter(([, d]) => d.dd).length}</b><span>double-deck</span></div></div>
-      <h3>ROUTES SEEN</h3><div class="chips">${routes.map(([l]) => `<span class="chip" style="background:${routeColour(l)};color:${inkFor(routeColour(l))}">${esc(l)}</span>`).join("") || '<span class="muted">none yet</span>'}</div>
-      <h3>BUSDEX</h3>
-      <div class="dex">${dex.map(([f, d]) => `<div class="${d.irl ? "irl" : ""}" data-f="${esc(f)}"><b>${esc(d.name)}</b><span>${esc(f.split(" - ")[0])} · ${d.routes.map(esc).join(", ")}${d.irl ? " · ★" : ""}</span></div>`).join("") || '<span class="muted">Tap any bus on the map and press SPOT IT.</span>'}</div>`;
-    P.querySelectorAll("[data-f]").forEach((el) => el.onclick = () => {
-      const b = [...buses.values()].find((x) => x.fleet === el.dataset.f);
-      if (b) { select({ type: "bus", id: b.id }); following = b.id; cam.z = Math.max(cam.z, 2.5); renderCard(); } else toast("That bus isn't out on the road right now");
-    });
-  }
-}
-function focusLine(line) {
-  sel = { type: "line", id: line }; following = null; renderCard(); showRecenter();
-  const R = ROUTES.get(line);
-  let xs = [...buses.values()].filter((b) => b.line === line).map((b) => [b.x, b.y]);
-  if (R) for (const p of R.raw) for (let i = 0; i < p.length; i += 8) xs.push([p[i] / 2, p[i + 1] / 2]);
-  if (!xs.length) return;
-  const X = xs.map((p) => p[0]), Y = xs.map((p) => p[1]);
-  cam.x = (Math.min(...X) + Math.max(...X)) / 2; cam.y = (Math.min(...Y) + Math.max(...Y)) / 2;
-  const span = Math.max(Math.max(...X) - Math.min(...X), (Math.max(...Y) - Math.min(...Y)) * (CW / CH), 150);
-  cam.z = clamp(CW / DPR / (span * 1.15), 0.3, 3); clampCam();
-}
-function renderLegend() {
-  const rs = liveStats().sort((a, b) => String(a.line).localeCompare(String(b.line), undefined, { numeric: true }));
-  const L = $("legend");
-  L.innerHTML = rs.map((r) => `<span class="chip ${hiddenRoutes.has(r.line) ? "off" : ""}" data-l="${esc(r.line)}" style="background:${routeColour(r.line)};color:${inkFor(routeColour(r.line))}" title="${r.n} live">${esc(r.line)}</span>`).join("")
-    + (hiddenRoutes.size ? `<span class="chip all" data-all="1">show all</span>` : "");
-  L.querySelectorAll("[data-l]").forEach((el) => el.onclick = () => {
-    const l = el.dataset.l; hiddenRoutes.has(l) ? hiddenRoutes.delete(l) : hiddenRoutes.add(l); renderLegend();
-  });
-  const all = L.querySelector("[data-all]"); if (all) all.onclick = () => { hiddenRoutes.clear(); renderLegend(); };
-}
-function onLiveUpdate() { ensureMissions(); renderLegend(); if (tab === "live") renderPanel(); if (sel) renderCard(); }
-function tickStatus() {
-  const age = lastOk ? Math.round((Date.now() - lastOk) / 1000) : null;
-  const n = [...buses.values()].filter((b) => !b.gone).length;
-  $("status").textContent = age == null ? "connecting…" : `${n} buses live · ${age}s ago`;
-  $("dot").classList.toggle("stale", age == null || age > 60);
-}
-
 // ================================================================ BOOT
-$("bHome").onclick = () => { Object.assign(cam, HOME); following = null; };
+$("bHome").onclick = () => { Object.assign(cam, HOME); following = null; showRecenter(); };
 $("bStops").onclick = () => { showStops = !showStops; $("bStops").classList.toggle("is-success", showStops); };
 $("bRoutes").onclick = () => {
   routesMode = { live: "all", all: "off", off: "live" }[routesMode];
@@ -1341,35 +1280,35 @@ $("bStyle").onclick = () => {
   $("bStyle").textContent = `map: ${mapStyle === "clear" ? "clear" : "detailed"}`; store("theroute_style", mapStyle);
 };
 $("bRecenter").onclick = () => { if (sel?.type === "bus") { following = sel.id; cam.z = Math.max(cam.z, 2.2); } showRecenter(); };
-$("bStart").onclick = () => { $("intro").classList.remove("show"); PLAYER.intro = true; save(); };
 
 let cardTick = 0;
 async function boot() {
   const j = (u) => fetch(u).then((r) => r.json());
   let rj;
   [META, STOPS, LABELS, rj] = await Promise.all([j("data/meta.json"), j("data/stops.json"), j("data/labels.json"), j("data/routes.json")]);
+  for (const s of STOPS) STOP_BY_ID.set(s.id, s);
   for (const r of rj.routes) {
     const path = new Path2D();
     for (const p of r.paths) { path.moveTo(p[0] / rj.scale, p[1] / rj.scale); for (let i = 2; i < p.length; i += 2) path.lineTo(p[i] / rj.scale, p[i + 1] / rj.scale); }
     ROUTES.set(r.line, { line: r.line, heads: r.heads, trips: r.trips, path, raw: r.paths });
   }
-  for (const s of STOPS) STOP_BY_ID.set(s.id, s);
   mapStyle = recall("theroute_style") === "detail" ? "detail" : "clear";
   routesMode = ["live", "all", "off"].includes(recall("theroute_routes")) ? recall("theroute_routes") : "live";
   $("bStyle").textContent = `map: ${mapStyle === "clear" ? "clear" : "detailed"}`; $("bRoutes").textContent = `routes: ${routesMode}`;
   resize(); window.addEventListener("resize", resize);
   if (window.innerWidth < 760) cam.z = 1.4;
-  renderLevel(); renderPanel();
-  if (!PLAYER.intro) $("intro").classList.add("show");
+  if (SAVED.size) setTab("saved"); else renderPanel();
   document.fonts?.load(`11px ${FONT}`);
   requestAnimationFrame(frame);
   j("data/graph.json").then((g) => { G = buildGraph(g); });
-  j("data/patterns.json").then(loadPatterns);
+  await j("data/patterns.json").then(loadPatterns);           // timetable first, so the first poll can match trips
   poll(); setInterval(poll, POLL_MS);
   setInterval(() => {
-    tickStatus();
-    checkAlerts();
-    if (sel && ++cardTick % 5 === 0 && !document.activeElement?.closest?.("#card")) renderCard();   // countdowns stay fresh
+    tickStatus(); checkAlerts();
+    if (++cardTick % 5 === 0) {
+      if (sel && !document.activeElement?.closest?.("#card")) renderCard();        // countdowns stay fresh
+      if (tab === "nearby" && nearbyAt && Math.hypot(cam.x - nearbyAt[0], cam.y - nearbyAt[1]) > 40 && !ME) renderPanel();
+    }
     // hidden tabs get no rAF; paint anyway so the canvas is never stale
     if (performance.now() - lastFrame > 1000) { const n = performance.now(); stepBuses(n, 16); render(n); lastFrame = n; }
   }, 1000);

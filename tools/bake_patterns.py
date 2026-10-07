@@ -3,9 +3,11 @@
 A "pattern" is one ordered list of stops a line runs (e.g. the 1 towards
 Fulbourn). For each pattern we store:
     - its shape (map px) and each stop's distance along it
-    - the median scheduled time from the first stop to every stop
-    - every trip's start time + service id, so the page can tell which
-      timetabled journey a live bus is on and how early/late it is
+    - which stops are timing points (an early bus waits there)
+    - run-time profiles: each distinct set of scheduled times from the first
+      stop (peak and off-peak trips differ, so no averaging)
+    - every trip: start time, service id, profile, and a hash of its GTFS
+      trip_id so a live GTFS-RT trip_id maps straight onto its exact timetable
 plus the service calendars (which days each service runs).
 
     data/raw/ea_gtfs.zip -> docs/data/patterns.json
@@ -36,6 +38,15 @@ def proj(lat, lon):
 def inside(lat, lon, m=0.0):
     return (META["lat0"] - m <= lat <= META["lat1"] + m and
             META["lon0"] - m <= lon <= META["lon1"] + m)
+
+
+def fnv(s):
+    """Same FNV-1a as hash() in index.html, so the page can look trips up."""
+    h = 2166136261
+    for ch in s:
+        h ^= ord(ch)
+        h = (h * 16777619) & 0xFFFFFFFF
+    return format(h, "08x")
 
 
 def secs(t):
@@ -78,6 +89,67 @@ def project(shape, cum, x, y, start_seg=0):
     return best
 
 
+class Roads:
+    """The bus-drivable road graph from bake.py, for routing trips that have no GTFS shape."""
+    def __init__(self):
+        import heapq  # noqa: F401  (used in route)
+        g = json.load(open(os.path.join(DATA, "graph.json")))
+        sc = g["scale"]
+        self.xy = [(g["n"][2 * i] / sc, g["n"][2 * i + 1] / sc) for i in range(len(g["n"]) // 2)]
+        self.adj = collections.defaultdict(list)
+        e = g["e"]
+        for k in range(0, len(e), 3):
+            a, b, ow = e[k], e[k + 1], e[k + 2]
+            L = math.dist(self.xy[a], self.xy[b])
+            self.adj[a].append((b, L))
+            if not ow:
+                self.adj[b].append((a, L))
+        self.grid = collections.defaultdict(list)
+        for i, (x, y) in enumerate(self.xy):
+            self.grid[(int(x) // 32, int(y) // 32)].append(i)
+
+    def nearest(self, x, y):
+        best, bd = None, 40.0
+        cx, cy = int(x) // 32, int(y) // 32
+        for dx in (-1, 0, 1):
+            for dy in (-1, 0, 1):
+                for i in self.grid.get((cx + dx, cy + dy), ()):
+                    d = math.dist((x, y), self.xy[i])
+                    if d < bd and self.adj.get(i):
+                        best, bd = i, d
+        return best
+
+    def route(self, a, b, limit=40000):
+        import heapq
+        if a == b:
+            return [a]
+        tx, ty = self.xy[b]
+        g, came, pq, n = {a: 0.0}, {a: None}, [(0.0, a)], 0
+        while pq and n < limit:
+            _, u = heapq.heappop(pq); n += 1
+            if u == b:
+                path = []
+                while u is not None:
+                    path.append(u); u = came[u]
+                return path[::-1]
+            for v, L in self.adj.get(u, ()):
+                c = g[u] + L
+                if c < g.get(v, 1e18):
+                    g[v] = c; came[v] = u
+                    heapq.heappush(pq, (c + math.dist(self.xy[v], (tx, ty)), v))
+        return None
+
+    def shape_through(self, pts):
+        out = [pts[0]]
+        for (x0, y0), (x1, y1) in zip(pts, pts[1:]):
+            a, b = self.nearest(x0, y0), self.nearest(x1, y1)
+            path = self.route(a, b) if a is not None and b is not None else None
+            if path and len(path) > 1:
+                out += [self.xy[i] for i in path]
+            out.append((x1, y1))
+        return out
+
+
 def main():
     z = zipfile.ZipFile(os.path.join(RAW, "ea_gtfs.zip"))
 
@@ -105,9 +177,11 @@ def main():
         t0 = secs(lst[0]["departure_time"] or lst[0]["arrival_time"])
         offs = [secs(r["arrival_time"] or r["departure_time"]) - t0 for r in lst]
         p = pats.setdefault(key, {"line": line, "offs": [], "trips": [], "heads": collections.Counter(),
-                                  "shapes": collections.Counter()})
+                                  "shapes": collections.Counter(), "tp": None})
         p["offs"].append(offs)
-        p["trips"].append((t0, tr["service_id"]))
+        p["trips"].append((t0, tr["service_id"], tuple(offs), fnv(tid)))
+        if p["tp"] is None:
+            p["tp"] = [1 if r.get("timepoint", "1") == "1" else 0 for r in lst]
         p["heads"][html.unescape(tr["trip_headsign"]).split(",")[0].strip()] += 1
         if tr["shape_id"]:
             p["shapes"][tr["shape_id"]] += 1
@@ -121,10 +195,20 @@ def main():
 
     services = set()
     out, ext = [], {}
+    roads, routed = None, 0
     for (line, seq), p in pats.items():
-        if not p["shapes"]:
-            continue
-        pts = [proj(lat, lon) for _, lat, lon in sorted(shp[p["shapes"].most_common(1)[0][0]])]
+        if p["shapes"]:
+            pts = [proj(lat, lon) for _, lat, lon in sorted(shp[p["shapes"].most_common(1)[0][0]])]
+        else:
+            # no GTFS shape for any trip on this pattern: route stop-to-stop over the real roads
+            roads = roads or Roads()
+            sp = [proj(float(stops[sid]["stop_lat"]), float(stops[sid]["stop_lon"]))
+                  for sid in seq if sid in stops and stops[sid]["stop_lat"]]
+            inmap = [q for q in sp if -150 < q[0] < META["W"] + 150 and -150 < q[1] < META["H"] + 150]
+            if len(inmap) < 2:
+                continue
+            pts = roads.shape_through(inmap)
+            routed += 1
         pts = rdp(pts, 0.8)
         if len(pts) < 2:
             continue
@@ -132,6 +216,10 @@ def main():
         for (x0, y0), (x1, y1) in zip(pts, pts[1:]):
             cum.append(cum[-1] + math.hypot(x1 - x0, y1 - y0))
         offs = [int(statistics.median(col)) for col in zip(*p["offs"])]
+        profiles, prof_idx = [], {}
+        for _, _, o, _ in p["trips"]:
+            if o not in prof_idx:
+                prof_idx[o] = len(profiles); profiles.append(list(o))
         ds, seg = [], 0
         for sid in seq:
             s = stops.get(sid)
@@ -147,7 +235,7 @@ def main():
             ds.append(round(along, 1))
             if sid not in in_box:
                 ext[sid] = [s["stop_name"], round(x), round(y)]
-        for _, sv in p["trips"]:
+        for _, sv, _, _ in p["trips"]:
             services.add(sv)
         out.append({
             "line": line,
@@ -155,7 +243,9 @@ def main():
             "stops": list(seq),
             "d": ds,
             "offs": offs,
-            "trips": sorted([t, sv] for t, sv in p["trips"]),
+            "tp": p["tp"],
+            "profiles": profiles,
+            "trips": sorted([t, sv, prof_idx[o], h] for t, sv, o, h in p["trips"]),
             "shape": [round(v * 2) for xy in pts for v in xy],
         })
     out.sort(key=lambda p: (p["line"], -len(p["trips"])))
@@ -175,6 +265,7 @@ def main():
 
     with open(os.path.join(DATA, "patterns.json"), "w", encoding="utf-8") as f:
         json.dump({"scale": 2, "patterns": out, "calendar": cal, "ext": ext}, f, separators=(",", ":"))
+    print(f"routed {routed} shapeless patterns over the road graph")
     print(f"patterns.json: {len(out)} patterns, {len(cal)} services, {len(ext)} out-of-map stops, "
           f"{os.path.getsize(os.path.join(DATA, 'patterns.json')) // 1024} KB")
 
