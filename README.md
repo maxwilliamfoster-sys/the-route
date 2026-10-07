@@ -35,7 +35,28 @@ bash tools/fetch_data.sh   # OSM (Overpass) + NaPTAN into data/raw/
 curl -L -o data/raw/ea_gtfs.zip https://data.bus-data.dft.gov.uk/timetable/download/gtfs-file/east_anglia/
 py tools/bake.py           # -> docs/tiles/{clear,detail} + docs/data
 py tools/bake_routes.py    # -> docs/data/routes.json + routes-per-stop in stops.json
+py tools/bake_patterns.py  # -> docs/data/patterns.json (journey patterns, run times, trips, calendars for ETAs)
 ```
+
+## Tracking and arrival times
+
+Tapping a bus starts **tracking** it.
+
+It is matched to a timetabled journey pattern from the official BODS GTFS. The page projects the bus onto each candidate shape for its line, then scores each candidate on:
+- distance from the shape
+- heading
+- how well its destination matches
+- how close the nearest timetabled trip is in time
+
+From the matched pattern it shows:
+- the stops still to come, with ETAs from the scheduled running time between stops
+- whether the bus is early or late, compared against today's trips (using the calendars)
+- where the bus is (at a stop, or between two stops), plus its street and area
+- its progress along the whole journey
+- an arrival time at the terminus
+- a reminder 2 min before the bus reaches a chosen stop
+
+Stops show a departure board for the next hour, mixing LIVE buses with timetabled ones. The search box finds stops by name, area or street, and routes by number.
 
 ## Run locally
 ```
