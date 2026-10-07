@@ -17,9 +17,9 @@ THE ROUTE is a sister project to THE CUT: same look, but here the city is real a
 
 ## Rebuild the map
 ```
-py tools/bake.py
+bash tools/fetch_data.sh   # OSM (Overpass) + NaPTAN into data/raw/
+py tools/bake.py           # -> docs/tiles + docs/data
 ```
-Before running it, re-download `data/raw/*.json` with the Overpass queries listed at the top of the bake script's history.
 
 ## Run locally
 ```
