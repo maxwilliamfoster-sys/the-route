@@ -1,13 +1,13 @@
 # THE ROUTE
 
-A live map of every Cambridge bus. It shows where each bus is, where it's going, and when it will reach your stop.
+A live map of every Cambridge bus. It answers two questions: **when is my bus coming?** and **where is it now?**
 
-- **Tap a bus** to track it. The map shows the road ahead, and the card lists every remaining stop with an arrival time and the timetabled time. It also says whether the bus is early or late, and you can set an alert for 2 minutes before it reaches your stop.
-- **Tap a stop** for a departure board. It mixes live buses with timetabled ones and covers the next 90 minutes.
-- **NEARBY** lists the stops nearest you (with GPS) or nearest the map centre, each with its next departures.
-- **ROUTES** lists what's running now and how punctual each route is.
-- **SAVED** holds the stops you've starred.
-- **Search** finds any stop, area or street, or a route number.
+- **Home** lists the stops near you, or near the middle of the map, each with its next 3 buses. Star a stop and it moves to **SAVED**.
+- **Tap a stop** for its departure board. A green dot means a live bus you can tap to follow; everything else comes from the timetable.
+- **Tap a bus** to follow it. You see whether it's late, where it is now, and when it reaches each of the next stops. Tap 🔔 on a stop to get an alert 2 minutes before the bus arrives.
+- **Search** (top bar) finds stops, places and route numbers.
+- **← back** takes you to the previous screen.
+- The map stays quiet until you pick something. Then it shows only that route, its stops and its buses.
 
 ## How accurate is it?
 
