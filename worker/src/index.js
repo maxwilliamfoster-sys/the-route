@@ -24,10 +24,10 @@ export default {
     const url = new URL(req.url);
     if (req.method === "OPTIONS") return new Response(null, { headers: { ...cors, "Access-Control-Allow-Methods": "GET" } });
     if (url.pathname !== "/live") return new Response("THE ROUTE live relay: GET /live", { headers: cors });
-    if (!env.BODS_API_KEY) return json({ error: "BODS_API_KEY secret not set" }, 500, cors);
+    if (!(env.BODS_API_KEY || env.secret)) return json({ error: "BODS_API_KEY secret not set" }, 500, cors);
 
     if (!memo.body || Date.now() - memo.at > TTL_MS) {
-      const r = await fetch(`https://data.bus-data.dft.gov.uk/api/v1/gtfsrtdatafeed/?boundingBox=${BBOX}&api_key=${env.BODS_API_KEY}`,
+      const r = await fetch(`https://data.bus-data.dft.gov.uk/api/v1/gtfsrtdatafeed/?boundingBox=${BBOX}&api_key=${(env.BODS_API_KEY || env.secret)}`,
         { headers: { "User-Agent": "TheRoute/1.0 (Cambridge bus map)" } });
       if (!r.ok) {
         if (memo.body) return json(memo.body, 200, cors);     // serve the last good copy rather than nothing

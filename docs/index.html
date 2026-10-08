@@ -187,7 +187,7 @@
 // ======================================================================
 const BUSTIMES_URL = (m) =>
   `https://bustimes.org/vehicles.json?ymax=${m.lat1}&xmax=${m.lon1}&ymin=${m.lat0}&xmin=${m.lon0}`;
-const RELAY_DEFAULT = "";            // e.g. "https://the-route-live.<you>.workers.dev" once deployed
+const RELAY_DEFAULT = "https://the-route-live.maxwilliamfoster.workers.dev";   // worker/ — official GTFS-RT with exact trip ids
 const POLL_MS = 12000;
 const HOME = { x: 1880, y: 1680, z: 2 };
 const FONT = '"Departure Mono", ui-monospace, Menlo, monospace';
@@ -220,7 +220,7 @@ const distTxt = (m) => m < 1000 ? `${Math.round(m / 10) * 10} m` : `${(m / 1000)
 // relay URL: ?relay=https://... once (remembered), or RELAY_DEFAULT
 let RELAY = (() => {
   const q = new URLSearchParams(location.search).get("relay");
-  if (q !== null) { store("theroute_relay", q); return q; }
+  if (q !== null) { store("theroute_relay", q); return q || RELAY_DEFAULT; }   // ?relay= resets to the default
   return recall("theroute_relay") || RELAY_DEFAULT;
 })();
 
@@ -585,7 +585,9 @@ function journey(b) {
   const now = Date.now();
   if (b._J && now - b._Jt < 1000 && b._Jm === m && b._Ja === m.along) return b._J;
   const P = m.P, prof = m.trip ? P.profiles[m.trip.pi] : P.offs, o = offAt(P, m.along, prof);
-  const delay = m.trip ? (b.feedTime - (m.trip.dayStart + (m.trip.t0 + o.off) * 1000)) / 1000 : null;
+  let delay = m.trip ? (b.feedTime - (m.trip.dayStart + (m.trip.t0 + o.off) * 1000)) / 1000 : null;
+  // sitting at (or just past) the first stop ahead of time = waiting to start its trip, not running early
+  const layover = delay != null && ((o.prev <= 0 && delay < -60) || (o.prev <= 1 && delay < -300));
   const stopped = b.kmh != null && b.kmh < 3;
   const from = stopped ? now : Math.min(b.feedTime, now);           // a bus sat in traffic isn't getting closer
   let tpk = -1;                                                      // next timing point: an early bus waits there
@@ -594,11 +596,12 @@ function journey(b) {
   for (let j = o.prev + 1; j < P.stops.length; j++) {
     const sched = m.trip ? m.trip.dayStart + (m.trip.t0 + prof[j]) * 1000 : null;
     let at = from + (prof[j] - o.off) * 1000;
-    if (sched != null && delay < -30 && tpk >= 0 && j >= tpk) at = Math.max(at, sched);
+    if (sched != null && (layover || (delay < -30 && tpk >= 0 && j >= tpk))) at = Math.max(at, sched);
     at = Math.max(at, now);
     up.push({ i: j, id: P.stops[j], s: stopInfo(P.stops[j]), eta: (at - now) / 1000, at, sched });
   }
-  const J = { P, o, up, delay, how: m.how, trip: m.trip, passed: Math.max(0, o.prev + 1), total: P.stops.length,
+  if (layover) delay = 0;                                            // it will leave on time
+  const J = { P, o, up, delay, layover, how: m.how, trip: m.trip, passed: Math.max(0, o.prev + 1), total: P.stops.length,
     prevStop: o.prev >= 0 ? stopInfo(P.stops[o.prev]) : null, atStop: o.atStop >= 0 ? stopInfo(P.stops[o.atStop]) : null,
     first: stopInfo(P.stops[0]), last: stopInfo(P.stops[P.stops.length - 1]),
     startAt: m.trip ? m.trip.dayStart + m.trip.t0 * 1000 : null,
@@ -1006,7 +1009,8 @@ const HOW = {
 };
 
 function busCard(b) {
-  const J = journey(b), dt = delayText(J?.delay), near = nearestStop(b.fx, b.fy);
+  const J = journey(b), near = nearestStop(b.fx, b.fy);
+  const dt = J?.layover ? { t: `waiting · departs ${hm(J.startAt)}`, c: "" } : delayText(J?.delay);
   const age = Math.max(0, Math.round((Date.now() - b.feedTime) / 1000));
   let where;
   if (J?.atStop) where = `At <b>${esc(stopLabel(J.atStop))}</b>`;
