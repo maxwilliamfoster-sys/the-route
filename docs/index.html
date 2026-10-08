@@ -145,7 +145,7 @@
   </div>
   <aside>
     <div id="view"></div>
-    <div class="foot"><span id="acc"></span><button id="bStyle">map: clear</button><a href="https://github.com/maxwilliamfoster-sys/the-route#data" target="_blank" rel="noopener">data &amp; credits</a></div>
+    <div class="foot"><span id="acc"></span><span id="traf" title="Arrival times use how fast buses are actually moving on each road right now"></span><button id="bStyle">map: clear</button><a href="https://github.com/maxwilliamfoster-sys/the-route#data" target="_blank" rel="noopener">data &amp; credits</a></div>
   </aside>
 </main>
 <script>
@@ -371,7 +371,7 @@ async function poll() {
       b.lastSeen = now;
     }
     for (const b of buses.values()) if (!seen.has(b.id) && now - b.lastSeen > POLL_MS * 4) b.gone = true;
-    for (const b of buses.values()) if (!b.gone) matchBus(b);
+    for (const b of buses.values()) if (!b.gone) { matchBus(b); learn(b); }
     lastOk = Date.now();
     onLiveUpdate();
   } catch (e) { console.warn("poll failed", e); }
@@ -556,34 +556,131 @@ function matchBus(b) {
   b.m = best;
 }
 
+// ================================================================ LIVE TRAFFIC
+// Every bus is a traffic probe. Between two of its reports we know how far along its route it got
+// and how long the timetable allows for that stretch; observed ÷ timetabled is how congested that
+// road is right now. Ratios are kept per ~120 m road cell (so every route on the same road shares
+// them), fade with a 12-minute time constant, and scale the remaining run times of every bus heading
+// that way. Stretches nobody has driven recently fall back to the timetable.
+const TCELL = 40, TAU = 12 * 60e3, PRIOR_W = 1.2;
+const TRAFFIC = new Map();                       // cell -> { lr: log(observed/timetabled), w, t }
+let trafficObs = 0;
+const cellOf = (x, y) => (Math.floor(x / TCELL) + 1000) * 100000 + (Math.floor(y / TCELL) + 1000);
+function pointAt(P, a) {
+  const C = P.C; let lo = 0, hi = C.length - 1;
+  if (a <= 0) return [P.X[0], P.Y[0]];
+  if (a >= C[hi]) return [P.X[hi], P.Y[hi]];
+  while (hi - lo > 1) { const mid = (lo + hi) >> 1; if (C[mid] <= a) lo = mid; else hi = mid; }
+  const f = (a - C[lo]) / ((C[hi] - C[lo]) || 1);
+  return [P.X[lo] + (P.X[hi] - P.X[lo]) * f, P.Y[lo] + (P.Y[hi] - P.Y[lo]) * f];
+}
+function cellsAlong(P, a1, a2) {
+  const out = new Set();
+  for (let a = a1; a < a2; a += TCELL / 2) { const [x, y] = pointAt(P, a); out.add(cellOf(x, y)); }
+  const [x, y] = pointAt(P, a2); out.add(cellOf(x, y));
+  return out;
+}
+const decayed = (c, now) => c.w * Math.exp(-(now - c.t) / TAU);
+function addObs(cells, lr, now) {
+  for (const k of cells) {
+    const c = TRAFFIC.get(k);
+    if (!c) { TRAFFIC.set(k, { lr, w: 1, t: now }); continue; }
+    const w0 = decayed(c, now);
+    c.lr = (c.lr * w0 + lr) / (w0 + 1); c.w = w0 + 1; c.t = now;
+  }
+}
+// live log-ratio for a stretch of route; cells nobody has measured pull it back toward the timetable
+function trafficLr(P, a1, a2, now) {
+  let s = 0, w = 0, n = 0;
+  for (const k of cellsAlong(P, a1, a2)) {
+    n++; const c = TRAFFIC.get(k);
+    if (c) { const cw = decayed(c, now); s += c.lr * cw; w += cw; }
+  }
+  return n ? s / (w + PRIOR_W * n) : 0;
+}
+function learn(b) {
+  const m = b.m;
+  if (!m?.trip) { b._obs = null; return; }
+  const cur = { P: m.P, key: m.trip.t0 + "@" + m.trip.dayStart, along: m.along, ms: b.feedTime };
+  const prev = b._obs;
+  if (!prev || prev.P !== cur.P || prev.key !== cur.key || cur.ms - prev.ms > 300e3) { b._obs = cur; return; }
+  const dt = (cur.ms - prev.ms) / 1000, da = cur.along - prev.along;
+  if (da < 3) return;                            // not moved yet: keep the anchor so a stall gets counted when it moves
+  b._obs = cur;
+  if (dt < 8) return;
+  const prof = m.P.profiles[m.trip.pi];
+  const o1 = offAt(m.P, prev.along, prof), o2 = offAt(m.P, cur.along, prof);
+  const sched = o2.off - o1.off;
+  if (sched < 10) return;
+  const delayThen = (prev.ms - (m.trip.dayStart + (m.trip.t0 + o1.off) * 1000)) / 1000;
+  if (delayThen < -45) return;                   // an early bus may be killing time, not stuck in traffic
+  const lr = Math.log(clamp(dt / sched, 0.33, 4));
+  addObs(cellsAlong(m.P, prev.along, cur.along), lr, Date.now());
+  b.selfLr = b.selfLr == null ? lr : b.selfLr * 0.6 + lr * 0.4; b.selfT = Date.now();
+  trafficObs++;
+}
+function saveTraffic() {
+  const now = Date.now(), rows = [];
+  for (const [k, c] of TRAFFIC) {
+    if (now - c.t < 25 * 60e3 && decayed(c, now) > 0.05) rows.push([k, +c.lr.toFixed(3), +c.w.toFixed(2), c.t]);
+    else TRAFFIC.delete(k);
+  }
+  store("theroute_traffic", JSON.stringify(rows));
+}
+function loadTraffic() {
+  try { for (const [k, lr, w, t] of JSON.parse(recall("theroute_traffic") || "[]")) TRAFFIC.set(k, { lr, w, t }); } catch {}
+}
+
 // everything the tracking card and boards need (memoised for a second)
-function journey(b) {
+function journey(b, opts) {
   const m = b.m; if (!m) return null;
-  const now = Date.now();
-  if (b._J && now - b._Jt < 1000 && b._Jm === m && b._Ja === m.along) return b._J;
+  const useTraffic = !(opts && opts.traffic === false), now = Date.now();
+  if (useTraffic && b._J && now - b._Jt < 1000 && b._Jm === m && b._Ja === m.along) return b._J;
   const P = m.P, prof = m.trip ? P.profiles[m.trip.pi] : P.offs, o = offAt(P, m.along, prof);
   let delay = m.trip ? (b.feedTime - (m.trip.dayStart + (m.trip.t0 + o.off) * 1000)) / 1000 : null;
   // sitting at (or just past) the first stop ahead of time = waiting to start its trip, not running early
   const layover = delay != null && ((o.prev <= 0 && delay < -60) || (o.prev <= 1 && delay < -300));
   const stopped = b.kmh != null && b.kmh < 3;
-  const from = stopped ? now : Math.min(b.feedTime, now);           // a bus sat in traffic isn't getting closer
-  let tpk = -1;                                                      // next timing point: an early bus waits there
-  for (let j = o.prev + 1; j < P.stops.length; j++) if (P.tp?.[j]) { tpk = j; break; }
+  let t = stopped ? now : Math.min(b.feedTime, now);                // a bus sat still isn't getting any closer
+  if (layover) t = Math.max(t, m.trip.dayStart + (m.trip.t0 + prof[Math.max(0, o.prev)]) * 1000);
+  const selfOk = useTraffic && b.selfLr != null && now - b.selfT < 6 * 60e3;
+  let a = m.along, offCur = o.off, lrSum = 0, lrN = 0;
   const up = [];
   for (let j = o.prev + 1; j < P.stops.length; j++) {
     const sched = m.trip ? m.trip.dayStart + (m.trip.t0 + prof[j]) * 1000 : null;
-    let at = from + (prof[j] - o.off) * 1000;
-    if (sched != null && (layover || (delay < -30 && tpk >= 0 && j >= tpk))) at = Math.max(at, sched);
-    at = Math.max(at, now);
+    let seg = Math.max(0, prof[j] - offCur);                         // timetabled seconds for this stretch
+    if (useTraffic) {
+      const dj = P.d[j];
+      let lr = dj > a ? trafficLr(P, a, dj, now) : 0;
+      if (selfOk) {                                                  // the bus's own pace counts most just ahead of it
+        const ws = Math.exp(-Math.max(0, (dj >= 0 ? dj : a) - m.along) / 500);
+        lr = ws * b.selfLr + (1 - ws) * lr;
+      }
+      lr = clamp(lr, Math.log(0.7), Math.log(2.5));
+      seg *= Math.exp(lr);
+      if (dj >= 0 && dj - m.along < 700) { lrSum += lr; lrN++; }
+    }
+    t += seg * 1000;
+    let at = Math.max(t, now);
+    // Fitted on 2,170 real Cambridge arrivals and tested on 1,450 held-out ones (tools/fit_eta.py):
+    // delay carries forward (~0.83×; early buses claw back less), timetabled run times run ~13% long.
+    if (sched != null && !layover && delay != null) {
+      const S = (sched - now) / 1000, age = Math.max(0, (now - b.feedTime) / 1000);
+      const eta = -12 + 0.868 * S + 0.825 * delay - 0.369 * Math.min(delay, 0) + (stopped ? 58.9 : 0) + 0.917 * age;
+      at = Math.max(now + Math.max(0, eta) * 1000, up.length ? up[up.length - 1].at : now);
+    }
     up.push({ i: j, id: P.stops[j], s: stopInfo(P.stops[j]), eta: (at - now) / 1000, at, sched });
+    if (sched != null && P.tp?.[j]) t = Math.max(t, sched);         // never leaves a timing point early
+    offCur = prof[j]; if (P.d[j] >= 0) a = P.d[j];
   }
   if (layover) delay = 0;                                            // it will leave on time
   const J = { P, o, up, delay, layover, how: m.how, trip: m.trip, passed: Math.max(0, o.prev + 1), total: P.stops.length,
+    traffic: lrN ? Math.exp(lrSum / lrN) : null,
     prevStop: o.prev >= 0 ? stopInfo(P.stops[o.prev]) : null, atStop: o.atStop >= 0 ? stopInfo(P.stops[o.atStop]) : null,
     first: stopInfo(P.stops[0]), last: stopInfo(P.stops[P.stops.length - 1]),
     startAt: m.trip ? m.trip.dayStart + m.trip.t0 * 1000 : null,
     schedEnd: m.trip ? m.trip.dayStart + (m.trip.t0 + prof[prof.length - 1]) * 1000 : null };
-  b._J = J; b._Jt = now; b._Jm = m; b._Ja = m.along;
+  if (useTraffic) { b._J = J; b._Jt = now; b._Jm = m; b._Ja = m.along; }
   return J;
 }
 function delayText(delay) {
@@ -1043,6 +1140,8 @@ function busView(b) {
   if (!J) status = `<span class="dim">Live position only (no timetable for this service)</span>`;
   else if (J.layover) status = `Waiting to leave at ${hm(J.startAt)}`;
   else { const dt = delayText(J.delay); status = `<span class="${STATUS_CLS[dt.c] || ""}">${dt.t === "on time" ? "On time" : dt.t[0].toUpperCase() + dt.t.slice(1)}</span>`; }
+  if (J?.traffic && J.traffic > 1.2) status += ` <span class="dim">· slow traffic ahead</span>`;
+  else if (J?.traffic && J.traffic < 0.85) status += ` <span class="dim">· clear roads ahead</span>`;
   if (J?.atStop) where = `Now at <b>${esc(J.atStop.name)}</b>`;
   else if (J?.prevStop && J.up[0]) where = `Now between <b>${esc(J.prevStop.name)}</b> and <b>${esc(J.up[0].s.name)}</b>`;
   else { const n = nearestStop(b.fx, b.fy); where = n ? `Now near <b>${esc(n.name)}</b>` : "Between stops"; }
@@ -1065,6 +1164,7 @@ function busView(b) {
     <details id="vMoreInfo"><summary>More about this bus</summary><div class="kv">
       ${J ? `<span>journey</span><span>${esc(J.first.name)}${J.startAt ? " " + hm(J.startAt) : ""} → ${esc(J.last.name)}${J.schedEnd ? " " + hm(J.schedEnd) : ""}</span>` : ""}
       <span>speed</span><span>${b.kmh == null ? "measuring" : b.kmh < 3 ? "stopped" : Math.round(b.kmh) + " km/h"}</span>
+      <span>traffic ahead</span><span>${J?.traffic ? (Math.abs(J.traffic - 1) < 0.08 ? "as timetabled" : `${Math.round(Math.abs(J.traffic - 1) * 100)}% ${J.traffic > 1 ? "slower" : "faster"} than timetabled (live)`) : "no recent readings"}</span>
       <span>last report</span><span>${age < 5 ? "just now" : age + " s ago"}</span>
       <span>vehicle</span><span>${esc(b.fleet)}${b.reg ? " · " + esc(b.reg) : ""}${b.features ? " · " + esc(b.features.toLowerCase()) : ""}</span>
       <span>times from</span><span>${J ? (J.how === "exact" ? "its exact timetabled trip" : "the timetable trip it best matches") : "—"}</span>
@@ -1142,6 +1242,8 @@ function tickStatus() {
   $("dot").classList.toggle("stale", age == null || age > 60);
   $("live").title = age == null ? "Connecting to live data" : `Updated ${age}s ago`;
   const acc = $("acc");
+  const roads = [...TRAFFIC.values()].filter((c) => Date.now() - c.t < 15 * 60e3).length;
+  $("traf").textContent = roads > 20 ? `live traffic: ${roads} road sections` : "live traffic: learning…";
   if (relayLive()) { acc.textContent = `exact trips: ${exact}/${all.length}`; acc.title = "These buses report the exact timetabled journey they're running, so their times are calculated from it."; }
   else { acc.textContent = "times: estimated"; acc.title = "Each bus's journey is worked out from its position and direction."; }
 }
@@ -1211,6 +1313,7 @@ async function boot() {
   mapStyle = recall("theroute_style") === "detail" ? "detail" : "clear";
   $("bStyle").textContent = `map: ${mapStyle === "clear" ? "clear" : "detailed"}`;
   if (SAVED.size) homeTab = "saved";
+  loadTraffic(); setInterval(saveTraffic, 60e3); window.addEventListener("pagehide", saveTraffic);
   resize(); window.addEventListener("resize", resize);
   if (window.innerWidth < 760) cam.z = 1.6;
   renderView();

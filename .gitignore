@@ -2,3 +2,4 @@ data/raw/
 __pycache__/
 _relay/
 _rt_test.json
+data/eval_raw*.json
