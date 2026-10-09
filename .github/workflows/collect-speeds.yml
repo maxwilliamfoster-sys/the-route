@@ -1,0 +1,43 @@
+name: collect road speeds
+
+# Every 10 minutes: watch every Cambridge bus for 8 minutes and record how long each
+# stop-to-stop stretch really takes, by hour of the week. Data lives on the speeds-data
+# branch so the live site isn't rebuilt every run. See tools/collect_speeds.py.
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: collect-speeds
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          ref: speeds-data
+          path: store
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: collect
+        run: python tools/collect_speeds.py --store store --minutes 8 --interval 15
+      - name: save
+        if: always()
+        run: |
+          cd store
+          git config user.name "the-route-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then echo "nothing new"; exit 0; fi
+          git commit -q -m "speeds $(date -u +%Y-%m-%dT%H:%MZ)"
+          for i in 1 2 3; do git pull --rebase -q && git push -q && exit 0; sleep 5; done
+          exit 1
