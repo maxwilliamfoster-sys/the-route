@@ -26,6 +26,19 @@ Several things make the arrival times more accurate:
 - **Report age:** the time since the position was reported is accounted for. A bus that is sitting still doesn't count down.
 - **Shapeless trips:** trips with no GTFS shape are routed stop to stop over the real road network, so every timetabled trip in the area is covered (273 patterns).
 
+### What we tested to make arrival times as accurate as possible
+
+Every method was scored against when ~25,000 real Cambridge buses actually reached their stops, across five live runs (mid-morning and the Friday school run). The tools for this are `tools/eval_eta.py` (records live predictions), `tools/replay_selfcorr.py` (replays the runs fairly, strictly in time order, grouped by predicted lead) and `tools/fit_eta.py`.
+
+| Method | 0–3 min | 3–7 min | 7–15 min |
+|---|---|---|---|
+| **Live position + current lateness + timetable run times (used)** | **92–102 s** | **129–151 s** | **183–197 s** |
+| Plus live road speeds learned from every bus ("traffic probes") | 95–102 s | 141–158 s | 207–215 s |
+| Plus self-correction from the app's own past errors | 94–104 s | 158–182 s | 183–197 s |
+| Formula fitted to real arrivals | better mid-morning, but broke in rush hour | | |
+
+The lesson: a bus's live position already includes the traffic it has hit, and its lateness carries forward almost one-for-one. The extra "smart" adjustments added noise rather than accuracy, so the app uses the method that tested best. The other methods are still in the code (`journey(b, {mode})`) so they can be re-tested, for example once there is more historical data.
+
 ### Turning on exact mode (free, about 5 minutes)
 
 1. Make a free account at the [Bus Open Data Service](https://data.bus-data.dft.gov.uk/) and copy your **API key** from your account page. Ask a parent if the sign-up asks for an adult.

@@ -26,6 +26,8 @@ def feats(r, kind):
     base = [1.0, S, d, min(d, 0.0), stop, r["age"]]
     if kind == "traffic":
         base += [lt * max(S + d, 0)]
+    if kind == "stacked" and "eX" in r:                 # also lean on the live-traffic run-time prediction
+        base += [r["lead"] + r["eX"]]
     return base
 
 
@@ -51,10 +53,12 @@ def evaluate(name, pred, rows):
 
 
 print("\nHELD-OUT TEST SET (last 40%)")
-evaluate("current app: timetable+holds", lambda r: r["lead"] + r["eS"], test)
-evaluate("current app: traffic model", lambda r: r["lead"] + r["eT"], test)
+evaluate("timetable only", lambda r: r["lead"] + r["eS"], test)
+if "eX" in test[0]:
+    evaluate("live-traffic run times only", lambda r: r["lead"] + r["eX"], test)
+evaluate("APP AS SHIPPED (final)", lambda r: r["lead"] + r["eT"], test)
 evaluate("delay carries on (sched + delay)", lambda r: max(0, r["schedRem"] + r["delay"]), test)
-for kind in ["plain", "traffic"]:
+for kind in (["plain", "stacked"] if "eX" in R[0] else ["plain", "traffic"]):
     b = fit(kind, train)
     evaluate(f"fitted ({kind})", lambda r, b=b, k=kind: max(0, float(np.dot(feats(r, k), b))), test)
     print("   coefficients:", [round(x, 3) for x in b])

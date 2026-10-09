@@ -34,18 +34,18 @@ window.__evStep = function () {
         const d = P.d[j]; if (d < 0 || !(prev.a < d && a >= d)) continue;
         const tAct = prev.ms + (d - prev.a) / (a - prev.a) * (b.feedTime - prev.ms);
         const list = E.preds.get(key + '#' + j); if (!list) continue;
-        for (const p of list) E.done.push(Object.assign({ lead: (tAct - p.made) / 1000, eT: (p.tr - tAct) / 1000, eS: (p.sc - tAct) / 1000, line: b.line, how: b.m.how, actSched: b.m.trip ? (tAct - (b.m.trip.dayStart + (b.m.trip.t0 + P.profiles[b.m.trip.pi][j]) * 1000)) / 1000 : null }, p.f));
+        for (const p of list) E.done.push(Object.assign({ lead: (tAct - p.made) / 1000, eT: (p.tr - tAct) / 1000, eS: (p.sc - tAct) / 1000, eX: (p.tx - tAct) / 1000, line: b.line, how: b.m.how, made: p.made, tAct, actSched: b.m.trip ? (tAct - (b.m.trip.dayStart + (b.m.trip.t0 + P.profiles[b.m.trip.pi][j]) * 1000)) / 1000 : null }, p.f));
         E.preds.delete(key + '#' + j);
       }
     }
     E.lastAlong.set(key, { a, ms: b.feedTime });
-    const J1 = journey(b), J0 = journey(b, { traffic: false });
+    const J1 = journey(b), J0 = journey(b, { mode: 'timetable' }), JX = journey(b, { mode: 'traffic' });
     if (!J1 || !J0 || J1.layover) continue;
     for (let k = 0; k < Math.min(12, J1.up.length); k++) {
-      const u = J1.up[k], u0 = J0.up[k]; if (P.d[u.i] < 0) continue;
+      const u = J1.up[k], u0 = J0.up[k], ux = JX.up[k]; if (P.d[u.i] < 0) continue;
       const pk = key + '#' + u.i; let list = E.preds.get(pk); if (!list) E.preds.set(pk, list = []);
       if (list.length && now - list[list.length - 1].made < 55e3) continue;
-      list.push({ made: now, tr: u.at, sc: u0.at, f: { k, delay: J1.delay, kmh: b.kmh, age: (now - b.feedTime) / 1000, traffic: J1.traffic, self: b.selfLr, schedRem: u.sched != null ? (u.sched - now) / 1000 : null, atStop: !!J1.atStop, tps: P.tp ? P.tp.slice(J1.o.prev + 1, u.i + 1).reduce((s, x) => s + x, 0) : 0, isTp: !!P.tp?.[u.i] } });
+      list.push({ made: now, tr: u.at, sc: u0.at, tx: ux.at, f: { k, delay: J1.delay, kmh: b.kmh, age: (now - b.feedTime) / 1000, traffic: J1.traffic, self: b.selfLr, schedRem: u.sched != null ? (u.sched - now) / 1000 : null, atStop: !!J1.atStop, tps: P.tp ? P.tp.slice(J1.o.prev + 1, u.i + 1).reduce((s, x) => s + x, 0) : 0, isTp: !!P.tp?.[u.i] } });
     }
   }
   E.polls++;
@@ -60,15 +60,15 @@ STATS = r"""
   const within = (a, k, s) => a.length ? Math.round(100 * a.filter((x) => Math.abs(x[k]) <= s).length / a.length) : null;
   const rows = [[0, 180], [180, 420], [420, 900], [900, 3600]].map(([lo, hi]) => {
     const a = D.filter((x) => x.lead >= lo && x.lead < hi);
-    return { lead: `${lo / 60}-${hi / 60} min`, n: a.length, traffic_mae_s: mae(a, 'eT'), timetable_mae_s: mae(a, 'eS'),
+    return { lead: `${lo / 60}-${hi / 60} min`, n: a.length, final_mae_s: mae(a, 'eT'), traffic_only_mae_s: mae(a, 'eX'), timetable_mae_s: mae(a, 'eS'),
              traffic_within_1min: within(a, 'eT', 60), timetable_within_1min: within(a, 'eS', 60) };
   });
   return { minutes: +((Date.now() - E.started) / 60000).toFixed(1), polls: E.polls, scored: D.length,
-           traffic_mae_s: mae(D, 'eT'), timetable_mae_s: mae(D, 'eS'),
+           final_mae_s: mae(D, 'eT'), traffic_only_mae_s: mae(D, 'eX'), timetable_mae_s: mae(D, 'eS'),
            traffic_within_1min: within(D, 'eT', 60), timetable_within_1min: within(D, 'eS', 60),
            traffic_bias_s: D.length ? Math.round(D.reduce((s, x) => s + x.eT, 0) / D.length) : null,
            timetable_bias_s: D.length ? Math.round(D.reduce((s, x) => s + x.eS, 0) / D.length) : null,
-           rows, traffic_cells: TRAFFIC.size, traffic_obs: trafficObs, buses: buses.size };
+           rows, calibration_obs: calN, traffic_cells: TRAFFIC.size, traffic_obs: trafficObs, buses: buses.size };
 })()
 """
 
@@ -95,7 +95,7 @@ def main():
         while time.time() < end:
             time.sleep(60)
             s = page.evaluate(STATS)
-            print(f"[{s['minutes']} min] scored={s['scored']} traffic_mae={s['traffic_mae_s']}s "
+            print(f"[{s['minutes']} min] scored={s['scored']} final={s['final_mae_s']}s traffic_only={s['traffic_only_mae_s']}s "
                   f"timetable_mae={s['timetable_mae_s']}s cells={s['traffic_cells']}", flush=True)
         print("FINAL " + json.dumps(page.evaluate(STATS)), flush=True)
         raw = page.evaluate("window.__ev.done")
